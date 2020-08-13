@@ -28,14 +28,15 @@ if mini == 'mini':
     valid_data = (valid_data[0][-10000:], valid_data[1][-10000:])
     test_data = (test_data[0][-10000:], test_data[1][-10000:])
 
-print('train POS ratio', train_data[1].mean())
-print('valid POS ratio', valid_data[1].mean())
-print('test POS ratio', test_data[1].mean())
-
 if binary == 'binary':
     train_data = Data_Process.binarize_data(train_data)
     valid_data = Data_Process.binarize_data(valid_data)
     test_data = Data_Process.binarize_data(test_data)
+
+print('train POS ratio', train_data[1].mean())
+print('valid POS ratio', valid_data[1].mean())
+print('test POS ratio', test_data[1].mean())
+print('GPU working', tf.test.is_gpu_available())
 
 input_shape = train_data[0].shape[1:]
 train_data = tf.data.Dataset.from_tensor_slices(train_data).batch(batch_size)
@@ -50,8 +51,7 @@ model.load(log_path + 'model.h5')
 
 model.fit(train_data, valid_data, epochs=100, filepath=log_path)
 loss, metrics = model.evaluate(test_data)
-print('Test Loss', loss)
-print('Test Metrics', metrics)
+print('Test Loss', loss, 'Test Metrics', metrics)
 
 
 # usage: nohup python main.py 4 binary mini max > 4_binary_mini_max.log 2>&1 &

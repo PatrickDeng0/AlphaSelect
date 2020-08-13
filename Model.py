@@ -33,6 +33,7 @@ class CNN_Pred:
         model.add(self.pooling_choice(shape=(2, 1)))
         model.add(tf.keras.layers.Flatten())
         model.add(tf.keras.layers.Dense(self._num_hidden, activation='relu'))
+        model.add(tf.keras.layers.Dense(self._num_hidden, activation='relu'))
         if self._binary == 'binary':
             model.add(tf.keras.layers.Dense(2, activation='softmax'))
             model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
@@ -50,9 +51,8 @@ class CNN_Pred:
             es = EarlyStopping(monitor='val_accuracy', mode='auto', patience=10, verbose=2)
         else:
             es = EarlyStopping(monitor='val_mse', mode='auto', patience=10, verbose=2)
-        history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es])
+        self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es])
         self._model.save(filepath + 'model.h5')
-        return history
 
     def evaluate(self, test_data):
         return self._model.evaluate(test_data)
@@ -63,5 +63,6 @@ class CNN_Pred:
     def load(self, filename):
         try:
             self._model = tf.keras.models.load_model(filename)
+            print('Load model successful!')
         except:
-            pass
+            print('Create New Model now!')
