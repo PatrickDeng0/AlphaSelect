@@ -8,7 +8,10 @@ size = sys.argv[1]
 binary = sys.argv[2]
 mini = sys.argv[3]
 pooling = sys.argv[4]
-log_path = '_'.join(sys.argv[1:]) + '/'
+
+log_path = 'logs/'
+os.makedirs(log_path, exist_ok=True)
+log_path = log_path + '_'.join(sys.argv[1:]) + '/'
 os.makedirs(log_path, exist_ok=True)
 
 batch_size = 512
@@ -20,7 +23,7 @@ if mini == 'mini':
     valid_data = (valid_data[0][-10000:], valid_data[1][-10000:])
     test_data = (test_data[0][-10000:], test_data[1][-10000:])
 
-if binary == 'bin':
+if binary == 'binary':
     train_data = Data_Process.binarize_data(train_data)
     valid_data = Data_Process.binarize_data(valid_data)
     test_data = Data_Process.binarize_data(test_data)
@@ -38,3 +41,6 @@ model.fit(train_data, valid_data, epochs=10, filepath=log_path)
 loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss)
 print('Test Metrics', metrics)
+
+
+# usage: nohup python main.py 4 binary mini max > 4_binary_mini_max.log 2>&1 &

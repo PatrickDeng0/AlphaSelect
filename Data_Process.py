@@ -7,15 +7,7 @@ import datetime as dt
 def mat_reader(filename):
     with h5py.File(filename) as mat:
         mat_data = mat['StockMat']
-        mat_tkrs = mat_data['tkrs'][0]
         tickers = []
-        for i in range(mat_tkrs.shape[0]):
-            st = mat_tkrs[i]
-            obj = mat_data[st]
-            string = "".join(chr(i) for i in obj[:])
-            tickers.append(string)
-        tickers = np.array(tickers)
-
         dates = mat_data['dtes'].value[0].astype(np.int32)
         st_state = mat_data['STState'].value
         clse = mat_data['clse'].value
@@ -80,8 +72,8 @@ def extract_2_X():
     time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
 
     # Unzip
-    tickers, dates, st_state, AdjustClse, clse, pclse, val, shr, TotalShares = d_res
-    _, _, ask_order_volume_total, bid_order_volume_total, volume, close, pre_close, vwap = ticks_res
+    _, dates, st_state, AdjustClse, clse, pclse, val, shr, TotalShares = d_res
+    tickers, _, ask_order_volume_total, bid_order_volume_total, volume, close, pre_close, vwap = ticks_res
     _, _, amount_ask, amount_bid = trans_res
 
     # calculate the adjuested price and its return
