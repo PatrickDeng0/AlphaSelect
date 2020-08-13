@@ -51,7 +51,7 @@ class CNN_Pred:
         else:
             es = EarlyStopping(monitor='val_mse', mode='auto', patience=10, verbose=2)
         history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es])
-        self._model.save(filepath)
+        self._model.save(filepath + 'model.h5')
         return history
 
     def evaluate(self, test_data):
@@ -59,3 +59,9 @@ class CNN_Pred:
 
     def predict(self, test_X):
         return self._model.predict(test_X)
+
+    def load(self, filename):
+        try:
+            self._model = tf.keras.models.load_model(filename)
+        except:
+            pass
