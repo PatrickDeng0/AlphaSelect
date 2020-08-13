@@ -1,4 +1,3 @@
-import copy, os
 import logging
 import logging.handlers
 import numpy as np
@@ -27,5 +26,5 @@ class Logger:
         self.logger.addHandler(th)
 
 
-def file_reader():
+if __name__ == '__main__':
     pass
