@@ -48,9 +48,12 @@ model = Model.CNN_Pred(input_shape=input_shape, learning_rate=0.001, num_channel
                        num_hidden=64, pool_method=pooling, binary=binary)
 model.summary()
 model.load(log_path + 'model.h5')
+print(model._model.optimizer.lr.numpy())
 model.change_LR(0.0001)
+print(model._model.optimizer.lr.numpy())
 
 model.fit(train_data, valid_data, epochs=100, filepath=log_path)
+print(model._model.optimizer.lr.numpy())
 loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss, 'Test Metrics', metrics)
 
