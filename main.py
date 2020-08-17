@@ -8,6 +8,7 @@ size = sys.argv[1]
 binary = sys.argv[2]
 mini = sys.argv[3]
 pooling = sys.argv[4]
+os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[5]
 
 log_path = 'logs/'
 os.makedirs(log_path, exist_ok=True)
@@ -40,22 +41,20 @@ print('GPU working', tf.test.is_gpu_available())
 
 input_shape = train_data[0].shape[1:]
 train_data = tf.data.Dataset.from_tensor_slices(train_data).batch(batch_size)
-valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
-test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
+valid_data = tf.data.Dataset.from_tensor_slices(valid_data)
+test_data = tf.data.Dataset.from_tensor_slices(test_data)
 
 
-model = Model.CNN_Pred(input_shape=input_shape, learning_rate=0.001, num_channel=8,
-                       num_hidden=64, pool_method=pooling, binary=binary)
+model = Model.CNN_Pred(input_shape=input_shape, learning_rate=0.001, num_channel=64,
+                       num_hidden=8, pool_method=pooling, binary=binary)
 model.summary()
 model.load(log_path + 'model.h5')
-print(model._model.optimizer.lr.numpy())
-model.change_LR(0.0001)
-print(model._model.optimizer.lr.numpy())
+print('LR before training:', model._model.optimizer.lr.numpy())
 
 model.fit(train_data, valid_data, epochs=100, filepath=log_path)
-print(model._model.optimizer.lr.numpy())
+print('LR after training:', model._model.optimizer.lr.numpy())
 loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss, 'Test Metrics', metrics)
 
 
-# usage: nohup python main.py 4 binary mini max > 4_binary_mini_max.log 2>&1 &
+# usage: nohup python main.py 4 mse mini max 0 > 4_binary_mini_max.log 2>&1 &

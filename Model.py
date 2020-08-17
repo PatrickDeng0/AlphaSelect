@@ -6,7 +6,7 @@ import os
 
 
 class CNN_Pred:
-    def __init__(self, input_shape, learning_rate=0.001, num_channel=8, num_hidden=64,
+    def __init__(self, input_shape, learning_rate=0.001, num_channel=64, num_hidden=8,
                  pool_method='max', binary='binary'):
         self._input_shape = input_shape
         self._learning_rate = learning_rate
@@ -62,11 +62,11 @@ class CNN_Pred:
         if self._binary == 'binary':
             es = tk.callbacks.EarlyStopping(monitor='val_accuracy', mode='auto', patience=20, verbose=2)
             low_LR = tk.callbacks.ReduceLROnPlateau(monitor='val_accuracy', factor=0.1, patience=10, mode='auto',
-                                                    min_lr=0.00001, verbose=2)
+                                                    min_lr=0.000001, verbose=2)
         else:
             es = tk.callbacks.EarlyStopping(monitor='val_mse', mode='auto', patience=20, verbose=2)
             low_LR = tk.callbacks.ReduceLROnPlateau(monitor='val_mse', factor=0.1, patience=10, mode='auto',
-                                                    min_lr=0.00001, verbose=2)
+                                                    min_lr=0.000001, verbose=2)
 
         self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es, low_LR])
         self._model.save(filepath + 'model.h5')
