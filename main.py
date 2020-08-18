@@ -6,7 +6,7 @@ import sys, os, pickle
 
 size = sys.argv[1]
 mini = sys.argv[2]
-os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[3]
+# os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[3]
 
 log_path = 'logs/'
 os.makedirs(log_path, exist_ok=True)
@@ -23,7 +23,7 @@ except:
         pickle.dump((tickers, train_date, valid_date, test_date, train_data, valid_data, test_data), file, protocol=4)
 
 if mini == 'mini':
-    train_data = (train_data[0][-100000:], train_data[1][-100000:])
+    train_data = (train_data[0][:100000], train_data[1][:100000])
     valid_data = (valid_data[0][-10000:], valid_data[1][-10000:])
     test_data = (test_data[0][-10000:], test_data[1][-10000:])
 
@@ -41,7 +41,7 @@ model.summary()
 model.load(log_path + 'model.h5')
 print('LR before training:', model._model.optimizer.lr.numpy())
 
-model.fit(train_data, valid_data, epochs=5, filepath=log_path)
+model.fit(train_data, valid_data, epochs=50, filepath=log_path)
 print('LR after training:', model._model.optimizer.lr.numpy())
 loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss, 'Test Metrics', metrics)
