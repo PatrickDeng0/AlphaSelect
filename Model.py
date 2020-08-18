@@ -13,7 +13,7 @@ class IC(tf.keras.metrics.Metric):
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         corr = tfp.stats.correlation(y_true, y_pred)
-        self.value.assign_add(tf.reduce_mean(tf.square(corr)))
+        self.value.assign(tf.reduce_mean(tf.abs(corr)))
 
     def result(self):
         return self.value
