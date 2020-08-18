@@ -167,11 +167,6 @@ def X_cut(raw_data, size):
     return np.array(X), np.array(Y)
 
 
-def binarize_data(dataset):
-    binary_y = (dataset[1] > 0) + 0
-    return dataset[0], binary_y
-
-
 def main(size):
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = extract_2_X()
     print('Extract Finish!')
