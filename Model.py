@@ -76,7 +76,52 @@ class CNN_Pred:
         low_LR = tk.callbacks.ReduceLROnPlateau(monitor='val_IC', factor=0.1, patience=5, mode='max',
                                                 min_lr=0.000001, verbose=2)
         self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es, low_LR])
-        self._model.save(filepath + 'model.h5')
+        self._model.save(filepath + 'CNN_model.h5')
+
+    def evaluate(self, test_data):
+        return self._model.evaluate(test_data)
+
+    def predict(self, test_X):
+        return self._model.predict(test_X)
+
+    def load(self, filename):
+        try:
+            self._model = tf.keras.models.load_model(filename)
+            print('Load model successful!')
+        except:
+            print('Create New Model now!')
+
+
+class LSTM_model:
+    def __init__(self, input_shape, learning_rate=0.001, num_hidden=64):
+        self._input_shape = input_shape
+        self._learning_rate = learning_rate
+        self._num_hidden = num_hidden
+        self._model = self._build_model()
+
+    def _build_model(self):
+        model = tk.Sequential()
+        model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(units=self._num_hidden),
+                                                input_shape=self._input_shape))
+        model.add(tf.keras.layers.Dense(units=self._num_hidden, activation=tf.nn.relu))
+        model.add(tf.keras.layers.Dense(units=1))
+        model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+        return model
+
+    def summary(self):
+        self._model.summary()
+
+    def change_LR(self, learningrate):
+        self._model.compile(optimizer=tk.optimizers.Adam(learning_rate=learningrate),
+                            loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+
+    def fit(self, train_data, valid_data, epochs, filepath):
+        es = tk.callbacks.EarlyStopping(monitor='val_IC', mode='max', patience=20, verbose=2)
+        low_LR = tk.callbacks.ReduceLROnPlateau(monitor='val_IC', factor=0.1, patience=5, mode='max',
+                                                min_lr=0.000001, verbose=2)
+        self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es, low_LR])
+        self._model.save(filepath + 'LSTM_model.h5')
 
     def evaluate(self, test_data):
         return self._model.evaluate(test_data)

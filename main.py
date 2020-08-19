@@ -8,7 +8,8 @@ size = sys.argv[1]
 mini = sys.argv[2]
 batch_size = sys.argv[3]
 init_lr = sys.argv[4]
-os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[5]
+mode = sys.argv[5]
+os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[6]
 
 log_path = 'logs/'
 os.makedirs(log_path, exist_ok=True)
@@ -42,16 +43,22 @@ valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
 test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
 
-model = Model.CNN_Pred(input_shape=input_shape, learning_rate=init_lr, num_channel=64, num_hidden=16,
-                       kernel_size=(3,1), pool_size=(2,1))
-model.summary()
-model.load(log_path + 'model.h5')
-print('LR before training:', model._model.optimizer.lr.numpy())
+if mode == 'cnn':
+    model = Model.CNN_Pred(input_shape=input_shape, learning_rate=init_lr, num_channel=64, num_hidden=16,
+                           kernel_size=(3,1), pool_size=(2,1))
+    model.summary()
+    model.load(log_path + 'CNN_model.h5')
+else:
+    model = Model.LSTM_model(input_shape=input_shape, learning_rate=init_lr, num_hidden=16)
+    model.summary()
+    model.load(log_path + 'LSTM_model.h5')
 
+
+print('LR before training:', model._model.optimizer.lr.numpy())
 model.fit(train_data, valid_data, epochs=50, filepath=log_path)
 print('LR after training:', model._model.optimizer.lr.numpy())
 loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss, 'Test Metrics', metrics)
 
 
-# usage: nohup python main.py 4 mini 8192 1 0 > 4_mini_8192_1.log 2>&1 &
+# usage: python main.py 4 full 8192 2 lstm 0 > logs/4_full_8192_2/lstm_train.log
