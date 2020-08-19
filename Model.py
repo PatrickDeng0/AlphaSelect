@@ -1,22 +1,24 @@
 import tensorflow as tf
 import tensorflow.keras as tk
 import tensorflow_probability as tfp
+import tensorflow.keras.backend as K
 
 import numpy as np
 import os
 
 
-class IC(tf.keras.metrics.Metric):
-    def __init__(self, name='IC', **kwargs):
-        super(IC, self).__init__(name=name, **kwargs)
-        self.value = self.add_weight(name='IC', initializer='zeros')
-
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        corr = tfp.stats.correlation(y_true, y_pred)
-        self.value.assign(tf.reduce_mean(tf.abs(corr)))
-
-    def result(self):
-        return self.value
+def IC(y_true, y_pred):
+    x = y_true
+    y = y_pred
+    mx = K.mean(x, axis=0)
+    my = K.mean(y, axis=0)
+    xm, ym = x - mx, y - my
+    r_num = K.sum(xm * ym)
+    x_square_sum = K.sum(xm * xm)
+    y_square_sum = K.sum(ym * ym)
+    r_den = K.sqrt(x_square_sum * y_square_sum)
+    r = r_num / r_den
+    return K.abs(K.mean(r))
 
 
 class CNN_Pred:
@@ -61,7 +63,7 @@ class CNN_Pred:
         model = tk.Model(inputs=inputs, outputs=output)
 
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
-                      loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC])
         return model
 
     def summary(self):
@@ -69,7 +71,7 @@ class CNN_Pred:
 
     def change_LR(self, learningrate):
         self._model.compile(optimizer=tk.optimizers.Adam(learning_rate=learningrate),
-                            loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+                            loss=tk.losses.MeanSquaredError(), metrics=[IC])
 
     def fit(self, train_data, valid_data, epochs, filepath):
         es = tk.callbacks.EarlyStopping(monitor='val_IC', mode='max', patience=20, verbose=2)
@@ -106,7 +108,7 @@ class LSTM_model:
         model.add(tf.keras.layers.Dense(units=self._num_hidden, activation=tf.nn.relu))
         model.add(tf.keras.layers.Dense(units=1))
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
-                      loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC])
         return model
 
     def summary(self):
@@ -114,13 +116,10 @@ class LSTM_model:
 
     def change_LR(self, learningrate):
         self._model.compile(optimizer=tk.optimizers.Adam(learning_rate=learningrate),
-                            loss=tk.losses.MeanSquaredError(), metrics=[IC()])
+                            loss=tk.losses.MeanSquaredError(), metrics=[IC])
 
     def fit(self, train_data, valid_data, epochs, filepath):
-        es = tk.callbacks.EarlyStopping(monitor='val_IC', mode='max', patience=20, verbose=2)
-        low_LR = tk.callbacks.ReduceLROnPlateau(monitor='val_IC', factor=0.1, patience=5, mode='max',
-                                                min_lr=0.000001, verbose=2)
-        self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[es, low_LR])
+        self._model.fit(train_data, validation_data=valid_data, epochs=epochs)
         self._model.save(filepath + 'LSTM_model.h5')
 
     def evaluate(self, test_data):
