@@ -22,6 +22,10 @@ except:
     with open('data/size' + size + '.pkl', 'wb') as file:
         pickle.dump((tickers, train_date, valid_date, test_date, train_data, valid_data, test_data), file, protocol=4)
 
+train_data = Data_Process.dataset_normalize(train_data)
+valid_data = Data_Process.dataset_normalize(valid_data)
+test_data = Data_Process.dataset_normalize(test_data)
+
 if mini == 'mini':
     train_data = (train_data[0][:100000], train_data[1][:100000])
     valid_data = (valid_data[0][-10000:], valid_data[1][-10000:])

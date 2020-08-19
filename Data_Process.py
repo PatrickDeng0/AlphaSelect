@@ -124,19 +124,6 @@ def extract_2_X():
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
 
 
-# ele data structure:
-# ask_order_volume_total, bid_order_volume_total, volume (Volume related)
-# adj_close, adj_pre_close, adj_vwap (price related)
-# amount_ask, amount_bid (Amount related)
-
-def normalize(ele):
-    stand_price, stand_val, stand_volume = ele[5].mean(), ele[7].mean(), ele[2].mean()
-    X = np.vstack([ele[0]/stand_volume, ele[1]/stand_volume, ele[2]/stand_volume,
-                   ele[3]/stand_price, ele[4]/stand_price, ele[5]/stand_price,
-                   ele[6]/stand_val, ele[7]/stand_val])
-    return X.T
-
-
 def X_cut(raw_data, size):
     features, label_ret = raw_data
     st_state = features[0]
@@ -162,9 +149,39 @@ def X_cut(raw_data, size):
                 # if there is any return data is np.nan, then next
                 vwap_ret = label_ret[date+size-1, t, -1]
                 if not flag and not np.isnan(vwap_ret):
-                    X.append(normalize(res))
+                    X.append(np.vstack(res))
                     Y.append(vwap_ret)
     return np.array(X), np.array(Y)
+
+
+# ele data structure:
+# ask_order_volume_total, bid_order_volume_total, volume (Volume related)
+# adj_close, adj_pre_close, adj_vwap (price related)
+# amount_ask, amount_bid (Amount related)
+
+def ele_normalize(ele, full):
+    volume_total = ele[0] + ele[1]
+    amount_total = ele[6] + ele[7]
+    stand_price, stand_val, stand_volume = ele[5].mean(), ele[7].mean(), ele[2].mean()
+    if full:
+        X = np.vstack([ele[0]/volume_total - 0.5, ele[1]/volume_total - 0.5, ele[2]/stand_volume - 1,
+                       ele[3]/stand_price - 1, ele[4]/stand_price - 1, ele[5]/stand_price - 1,
+                       ele[6]/amount_total - 0.5, ele[7]/amount_total - 0.5,
+                       ele[0]/stand_volume, ele[1]/stand_volume,
+                       ele[6]/stand_val, ele[7]/stand_val])
+    else:
+        X = np.vstack([ele[0]/volume_total - 0.5, ele[1]/volume_total - 0.5, ele[2]/stand_volume - 1,
+                       ele[3]/stand_price - 1, ele[4]/stand_price - 1, ele[5]/stand_price - 1,
+                       ele[6]/amount_total - 0.5, ele[7]/amount_total - 0.5])
+    return X.T
+
+
+def dataset_normalize(dataset, full=False):
+    data_X, data_Y = dataset
+    res_X = []
+    for ele in data_X:
+        res_X.append(ele_normalize(ele, full))
+    return np.array(res_X), data_Y
 
 
 def main(size):
