@@ -6,14 +6,17 @@ import sys, os, pickle
 
 size = sys.argv[1]
 mini = sys.argv[2]
-# os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[3]
+batch_size = sys.argv[3]
+init_lr = sys.argv[4]
+os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[5]
 
 log_path = 'logs/'
 os.makedirs(log_path, exist_ok=True)
-log_path = log_path + '_'.join(sys.argv[1:3]) + '/'
+log_path = log_path + '_'.join(sys.argv[1:5]) + '/'
 os.makedirs(log_path, exist_ok=True)
 
-batch_size = 512
+batch_size = int(batch_size)
+init_lr = 10**(-int(init_lr))
 try:
     with open('data/size'+size+'.pkl', 'rb') as file:
         tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = pickle.load(file)
@@ -39,7 +42,7 @@ valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
 test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
 
-model = Model.CNN_Pred(input_shape=input_shape, learning_rate=0.001, num_channel=64, num_hidden=16,
+model = Model.CNN_Pred(input_shape=input_shape, learning_rate=init_lr, num_channel=64, num_hidden=16,
                        kernel_size=(3,1), pool_size=(2,1))
 model.summary()
 model.load(log_path + 'model.h5')
@@ -51,4 +54,4 @@ loss, metrics = model.evaluate(test_data)
 print('Test Loss', loss, 'Test Metrics', metrics)
 
 
-# usage: nohup python main.py 4 mini 0 > 4_mini.log 2>&1 &
+# usage: nohup python main.py 4 mini 8192 1 0 > 4_mini_8192_1.log 2>&1 &
