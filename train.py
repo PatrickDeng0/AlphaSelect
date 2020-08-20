@@ -4,7 +4,7 @@ import pickle, sys, os
 
 
 def main(inputs):
-    size, mini, batch_size, init_lr, mode = inputs
+    size, batch_size, init_lr, mode = inputs
     log_path = 'logs/' + '_'.join(inputs[:-1]) + '/'
     batch_size = int(batch_size)
     init_lr = 10 ** (-int(init_lr))
@@ -20,11 +20,6 @@ def main(inputs):
     train_data = Data_Process.dataset_normalize(train_data)
     valid_data = Data_Process.dataset_normalize(valid_data)
     test_data = Data_Process.dataset_normalize(test_data)
-
-    if mini == 'mini':
-        train_data = (train_data[0][:100000], train_data[1][:100000])
-        valid_data = (valid_data[0][-10000:], valid_data[1][-10000:])
-        test_data = (test_data[0][-10000:], test_data[1][-10000:])
 
     print('GPU working', tf.test.is_gpu_available())
 
@@ -44,12 +39,16 @@ def main(inputs):
         model.load(log_path + 'LSTM_model.h5')
 
     print('LR before training:', model._model.optimizer.lr.numpy())
-    model.fit(train_data, valid_data, epochs=50, filepath=log_path)
+    history = model.fit(train_data, valid_data, epochs=100, filepath=log_path)
+
+    with open(log_path + mode + '_history.pkl', 'wb') as file:
+        pickle.dump(history.history, file)
+
     print('LR after training:', model._model.optimizer.lr.numpy())
     loss, metrics = model.evaluate(test_data)
     print('Test Loss', loss, 'Test Metrics', metrics)
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[6]
+    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[5]
     main(sys.argv[1:-1])
