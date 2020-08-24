@@ -13,12 +13,12 @@ os.makedirs(log_path, exist_ok=True)
 
 cmd_line = '''\
 python train.py %s %s %s %s %s > %s%s_train.log\
-''' % (size, batch_size, init_lr, 'lstm', GPU, log_path, 'lstm')
+''' % (size, batch_size, init_lr, 'cnn', GPU, log_path, 'cnn')
 print(cmd_line)
 os.system(cmd_line)
 
 cmd_line = '''\
 python train.py %s %s %s %s %s > %s%s_train.log\
-''' % (size, batch_size, init_lr, 'cnn', GPU, log_path, 'cnn')
+''' % (size, batch_size, init_lr, 'lstm', GPU, log_path, 'lstm')
 print(cmd_line)
 os.system(cmd_line)

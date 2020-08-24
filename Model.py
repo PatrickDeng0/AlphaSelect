@@ -74,7 +74,8 @@ class CNN_Pred:
                             loss=tk.losses.MeanSquaredError(), metrics=[IC])
 
     def fit(self, train_data, valid_data, epochs, filepath):
-        rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, mode='auto', cooldown=5)
+        rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10,
+                                                  mode='auto', cooldown=5, min_lr=10**(-8))
         history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce])
         self._model.save(filepath + 'CNN_model.h5')
         return history
@@ -118,7 +119,8 @@ class LSTM_model:
                             loss=tk.losses.MeanSquaredError(), metrics=[IC])
 
     def fit(self, train_data, valid_data, epochs, filepath):
-        rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, mode='auto', cooldown=5)
+        rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10,
+                                                  mode='auto', cooldown=5, min_lr=10 ** (-8))
         history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce])
         self._model.save(filepath + 'LSTM_model.h5')
         return history
