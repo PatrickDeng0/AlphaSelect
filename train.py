@@ -52,7 +52,7 @@ def plot_history(history, test_loss, test_metrics, mode, log_path):
 
 
 def get_perform(model, test_data):
-    y_pred = model.predict(test_data[0])
+    y_pred = model.predict(test_data[0]).reshape(-1)
     y_true = test_data[1]
     loss = np.mean((y_true - y_pred)**2)
     IC = np.corrcoef(y_true, y_pred)[0, 1]
@@ -70,22 +70,13 @@ def perform(size, batch_size, init_lr, mode):
         return
 
     test_data = Data_Process.dataset_normalize(test_data)
-    input_shape = test_data[0].shape[1:]
     if mode == 'cnn':
-        model = Model.CNN_Pred(input_shape=input_shape, learning_rate=init_lr, num_channel=64, num_hidden=16,
-                               kernel_size=(3, 1), pool_size=(2, 1))
-        model.load(log_path + 'CNN_model.h5')
-
+        model = tf.keras.models.load_model(log_path + 'CNN_model.h5', custom_objects={'IC': Model.IC})
     else:
-        model = Model.LSTM_model(input_shape=input_shape, learning_rate=init_lr, num_hidden=16)
-        model.load(log_path + 'LSTM_model.h5')
+        model = tf.keras.models.load_model(log_path + 'LSTM_model.h5', custom_objects={'IC': Model.IC})
 
     with open(log_path + mode + '_history.pkl', 'wb') as file:
-        content = pickle.load(file)
-    if isinstance(content, tuple):
-        history = content[0]
-    else:
-        history = content
+        history, _, _ = pickle.load(file)
 
     test_loss, test_metrics = get_perform(model, test_data)
     plot_history(history, test_loss, test_metrics, mode, log_path)
@@ -117,14 +108,14 @@ def main(inputs):
     test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
     if mode == 'cnn':
-        model = Model.CNN_Pred(input_shape=input_shape, learning_rate=init_lr, num_channel=64, num_hidden=16,
-                               kernel_size=(3, 1), pool_size=(2, 1))
-        model.summary()
+        model = Model.CNN_Pred(input_shape, learning_rate=init_lr,
+                               num_vr_kernel=64, num_time_kernel=16, num_dense=16,
+                               kernel_size=(3,1), pool_size=(2,1))
         model.load(log_path + 'CNN_model.h5')
     else:
-        model = Model.LSTM_model(input_shape=input_shape, learning_rate=init_lr, num_hidden=16)
-        model.summary()
+        model = Model.LSTM_model(input_shape=input_shape, learning_rate=init_lr, num_dense=16)
         model.load(log_path + 'LSTM_model.h5')
+    model.summary()
 
     print('LR before training:', model._model.optimizer.lr.numpy())
     history = model.fit(train_data, valid_data, epochs=100, filepath=log_path)

@@ -2,7 +2,6 @@ import tensorflow as tf
 import tensorflow.keras as tk
 import tensorflow_probability as tfp
 import tensorflow.keras.backend as K
-
 import numpy as np
 import os
 
@@ -22,49 +21,45 @@ def IC(y_true, y_pred):
 
 
 class CNN_Pred:
-    def __init__(self, input_shape, learning_rate=0.001, num_channel=64, num_hidden=16,
+    def __init__(self, input_shape, learning_rate=0.001,
+                 num_vr_kernel=64, num_time_kernel=16, num_dense=16,
                  kernel_size=(3,1), pool_size=(2,1)):
+
         self._input_shape = input_shape
         self._learning_rate = learning_rate
-        self._num_channel = num_channel
-        self._num_hidden = num_hidden
+
+        self._num_vr_kernel = num_vr_kernel
+        self._num_time_kernel = num_time_kernel
+        self._num_dense = num_dense
+        self._conv_layer = self._input_shape[0] // 16
+
         self._kernel_size = kernel_size
         self._pool_size = pool_size
-        self._model = self._build_model()
+
+        self._model = None
 
     def _build_model(self):
         inputs = tk.layers.Input(shape=self._input_shape)
         re_shape = tuple(list(self._input_shape) + [1])
         x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
-        x = tk.layers.Conv2D(self._num_channel, (1, self._input_shape[1]), activation='relu')(x)
-        x = tk.layers.Conv2D(self._num_channel//2, self._kernel_size, activation='relu')(x)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation='relu')(x)
 
-        max_pool_1 = tk.layers.MaxPool2D(self._pool_size)(x)
-        aver_pool_1 = tk.layers.AvgPool2D(self._pool_size)(x)
+        for _ in range(self._conv_layer):
+            x = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, activation='relu')(x)
+            max_pool = tk.layers.MaxPool2D(self._pool_size)(x)
+            aver_pool = tk.layers.AvgPool2D(self._pool_size)(x)
+            x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
 
-        x = tk.layers.Concatenate(axis=3)([max_pool_1, aver_pool_1])
-        x = tk.layers.Conv2D(self._num_channel//2, self._kernel_size, activation='relu')(x)
-
-        max_pool_2 = tk.layers.MaxPool2D(self._pool_size)(x)
-        aver_pool_2 = tk.layers.AvgPool2D(self._pool_size)(x)
-
-        x = tk.layers.Concatenate(axis=3)([max_pool_2, aver_pool_2])
-        x = tk.layers.Conv2D(self._num_channel//2, self._kernel_size, activation='relu')(x)
-
-        max_pool_3 = tk.layers.MaxPool2D(self._pool_size)(x)
-        aver_pool_3 = tk.layers.AvgPool2D(self._pool_size)(x)
-
-        x = tk.layers.Concatenate(axis=3)([max_pool_3, aver_pool_3])
         x = tk.layers.Flatten()(x)
-        x = tk.layers.Dense(self._num_hidden, activation='relu')(x)
-        x = tk.layers.Dense(self._num_hidden, activation='relu')(x)
+        x = tk.layers.Dense(self._num_dense, activation='relu')(x)
+        x = tk.layers.Dense(self._num_dense, activation='relu')(x)
 
         output = tk.layers.Dense(1)(x)
         model = tk.Model(inputs=inputs, outputs=output)
 
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
                       loss=tk.losses.MeanSquaredError(), metrics=[IC])
-        return model
+        self._model = model
 
     def summary(self):
         self._model.summary()
@@ -75,8 +70,9 @@ class CNN_Pred:
 
     def fit(self, train_data, valid_data, epochs, filepath):
         rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10,
-                                                  mode='auto', cooldown=5, min_lr=10**(-8))
-        history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce])
+                                                  mode='auto', cooldown=5, min_lr=10**(-6))
+        ES = tk.callbacks.EarlyStopping(monitor='val_loss', patience=40, mode='min')
+        history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce, ES])
         self._model.save(filepath + 'CNN_model.h5')
         return history
 
@@ -88,28 +84,29 @@ class CNN_Pred:
 
     def load(self, filename):
         try:
-            self._model = tf.keras.models.load_model(filename)
-            print('Load model successful!')
+            self._model = tf.keras.models.load_model(filename, custom_objects={'IC': IC})
+            print('Load Succeed')
         except:
-            print('Create New Model now!')
+            self._build_model()
+            print('New Model Create')
 
 
 class LSTM_model:
-    def __init__(self, input_shape, learning_rate=0.001, num_hidden=64):
+    def __init__(self, input_shape, learning_rate=0.001, num_dense=16):
         self._input_shape = input_shape
         self._learning_rate = learning_rate
-        self._num_hidden = num_hidden
-        self._model = self._build_model()
+        self._num_dense = num_dense
+        self._model = None
 
     def _build_model(self):
         model = tk.Sequential()
-        model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(units=self._num_hidden),
+        model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(units=self._num_dense),
                                                 input_shape=self._input_shape))
-        model.add(tf.keras.layers.Dense(units=self._num_hidden, activation=tf.nn.relu))
+        model.add(tf.keras.layers.Dense(units=self._num_dense, activation=tf.nn.relu))
         model.add(tf.keras.layers.Dense(units=1))
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
                       loss=tk.losses.MeanSquaredError(), metrics=[IC])
-        return model
+        self._model = model
 
     def summary(self):
         self._model.summary()
@@ -120,8 +117,9 @@ class LSTM_model:
 
     def fit(self, train_data, valid_data, epochs, filepath):
         rlreduce = tk.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10,
-                                                  mode='auto', cooldown=5, min_lr=10 ** (-8))
-        history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce])
+                                                  mode='auto', cooldown=5, min_lr=10 ** (-6))
+        ES = tk.callbacks.EarlyStopping(monitor='val_loss', patience=40, mode='min')
+        history = self._model.fit(train_data, validation_data=valid_data, epochs=epochs, callbacks=[rlreduce, ES])
         self._model.save(filepath + 'LSTM_model.h5')
         return history
 
@@ -133,7 +131,8 @@ class LSTM_model:
 
     def load(self, filename):
         try:
-            self._model = tf.keras.models.load_model(filename)
-            print('Load model successful!')
+            self._model = tf.keras.models.load_model(filename, custom_objects={'IC': IC})
+            print('Load Succeed')
         except:
-            print('Create New Model now!')
+            self._build_model()
+            print('New Model Create')
