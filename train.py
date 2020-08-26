@@ -75,8 +75,8 @@ def perform(size, batch_size, init_lr, mode):
     else:
         model = tf.keras.models.load_model(log_path + 'LSTM_model.h5', custom_objects={'IC': Model.IC})
 
-    with open(log_path + mode + '_history.pkl', 'wb') as file:
-        history, _, _ = pickle.load(file)
+    with open(log_path + mode + '_history.pkl', 'rb') as file:
+        history, _, _, _, _ = pickle.load(file)
 
     test_loss, test_metrics = get_perform(model, test_data)
     plot_history(history, test_loss, test_metrics, mode, log_path)
@@ -100,12 +100,15 @@ def main(inputs):
     valid_data = Data_Process.dataset_normalize(valid_data)
     test_data = Data_Process.dataset_normalize(test_data)
 
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
     print('GPU working', tf.test.is_gpu_available())
 
     input_shape = train_data[0].shape[1:]
     train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
     valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
-    test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
+    test_data_tf = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
     if mode == 'cnn':
         model = Model.CNN_Pred(input_shape, learning_rate=init_lr,
@@ -121,12 +124,16 @@ def main(inputs):
     history = model.fit(train_data, valid_data, epochs=100, filepath=log_path)
 
     print('LR after training:', model._model.optimizer.lr.numpy())
-    test_loss, test_metrics = model.evaluate(test_data)
+    test_loss, test_metrics = model.evaluate(test_data_tf)
     print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
-    plot_history(history, test_loss, test_metrics, mode, log_path)
+    test_LOSS, test_IC = get_perform(model, test_data)
+    print('Self test!')
+    print('Test Loss', test_LOSS, 'Test Metrics', test_IC)
+
+    plot_history(history, test_LOSS, test_IC, mode, log_path)
     with open(log_path + mode + '_history.pkl', 'wb') as file:
-        pickle.dump((history.history, test_loss, test_metrics), file)
+        pickle.dump((history.history, test_loss, test_metrics, test_LOSS, test_IC), file)
 
 
 if __name__ == '__main__':

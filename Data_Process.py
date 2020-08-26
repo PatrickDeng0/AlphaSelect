@@ -1,5 +1,4 @@
 import numpy as np
-import util
 import h5py
 import datetime as dt
 

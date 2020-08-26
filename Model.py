@@ -1,9 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras as tk
-import tensorflow_probability as tfp
 import tensorflow.keras.backend as K
-import numpy as np
-import os
 
 
 def IC(y_true, y_pred):
@@ -31,12 +28,23 @@ class CNN_Pred:
         self._num_vr_kernel = num_vr_kernel
         self._num_time_kernel = num_time_kernel
         self._num_dense = num_dense
-        self._conv_layer = self._input_shape[0] // 16
 
         self._kernel_size = kernel_size
         self._pool_size = pool_size
+        self._conv_layer = self._get_conv_layer()
 
         self._model = None
+
+    def _get_conv_layer(self):
+        time_shape, ks, ps = self._input_shape[0], self._kernel_size[0]-1, self._pool_size[0]
+        res = 0
+        while True:
+            time_shape = (time_shape - ks) // ps
+            print(time_shape)
+            res += 1
+            if time_shape < 8:
+                break
+        return res
 
     def _build_model(self):
         inputs = tk.layers.Input(shape=self._input_shape)
