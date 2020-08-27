@@ -66,7 +66,7 @@ def extract_2_X():
     trans_res = trans_reader('data/w_data_trans_15min.h5')
 
     # Find the dates of total dataset
-    min_dates = 20160101
+    min_dates = 20160108
     max_dates = np.min([d_res[1].max(), ticks_res[1].max(), trans_res[1].max()])
     time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
 
