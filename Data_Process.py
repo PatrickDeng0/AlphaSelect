@@ -130,7 +130,7 @@ def extract_2_X():
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
 
 
-def X_cut(raw_data, size):
+def X_cut(raw_data, dates, size, train=False):
     features, label_rets = raw_data
     st_state = features[0]
     nd, nt = st_state.shape
@@ -140,6 +140,11 @@ def X_cut(raw_data, size):
             print('Now stock', t, dt.datetime.now())
         st_series = st_state[:, t]
         for date in range(nd-size+1):
+
+            # Find that day: 20170105, at train data 242
+            if train and 240 - size < date < 243:
+                continue
+
             # Not ST, and not trading halt!
             if np.sum(st_series[date:(date+size)]) == 0:
                 res, flag = [], False
@@ -218,11 +223,11 @@ def dataset_normalize(dataset, intra, start_bar, full=False):
 def main(size):
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = extract_2_X()
     print('Extract Finish!')
-    train_data = X_cut(train_data, size)
-    valid_data = X_cut(valid_data, size)
-    test_data = X_cut(test_data, size)
+    train_data = X_cut(train_data, train_date, size, train=True)
+    valid_data = X_cut(valid_data, valid_date, size)
+    test_data = X_cut(test_data, test_date, size)
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
 
 
 if __name__ == '__main__':
-    pass
+    main(4)

@@ -30,4 +30,4 @@ if LSTM:
     print(cmd_line)
     os.system(cmd_line)
 
-# nohup python3 main.py 12 10000 2 0 2 0 0 > /dev/null 2>&1 &
+# nohup python3 main.py 10 10000 3 1 2 0 1 > /dev/null 2>&1 &
