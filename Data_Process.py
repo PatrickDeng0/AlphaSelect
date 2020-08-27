@@ -66,31 +66,40 @@ def extract_2_X():
     trans_res = trans_reader('data/w_data_trans_15min.h5')
 
     # Find the dates of total dataset
-    min_dates = np.max([d_res[1].min(), ticks_res[1].min(), trans_res[1].min()])
+    min_dates = 20160101
     max_dates = np.min([d_res[1].max(), ticks_res[1].max(), trans_res[1].max()])
     time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
+
+    print('d_res shape:', d_res[-1].shape)
+    print('ticks_res shape:', ticks_res[-1].shape)
+    print('trans_res shape:', trans_res[-1].shape)
 
     # Unzip
     _, dates, st_state, AdjustClse, clse, pclse, val, shr, TotalShares = d_res
     tickers, _, ask_order_volume_total, bid_order_volume_total, volume, close, pre_close, vwap = ticks_res
     _, _, amount_ask, amount_bid = trans_res
 
-    # calculate the adjuested price and its return
+    # calculate the adjuested price, market value
     adjust_coef = AdjustClse / clse
     adj_close = close * adjust_coef[:, :, np.newaxis]
     adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
     adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
-    diff_vwap = np.diff(adj_vwap, axis=0)
-    vwap_ret = diff_vwap / adj_vwap[:-1]
-
-    # Get market return
     stock_value = TotalShares[:, :, np.newaxis] * vwap
     market_value = np.nansum(stock_value, axis=1)
+
+    # Get daily stock return and market return
+    diff_vwap_day = np.diff(adj_vwap, axis=0)
+    vwap_ret = diff_vwap_day / adj_vwap[:-1]
     diff_market = np.diff(market_value, axis=0)
     market_ret = diff_market / market_value[:-1]
-
-    # Label return
     label_ret = vwap_ret - market_ret[:, np.newaxis, :]
+
+    # Get daily stock return and market return
+    vwap_ret_intra = adj_vwap / adj_vwap[:, :, -1][:, :, np.newaxis]
+    vwap_ret_intra = 1 / vwap_ret_intra - 1
+    market_ret_intra = market_value / market_value[:, -1][:, np.newaxis]
+    market_ret_intra = 1 / market_ret_intra - 1
+    label_ret_intra = vwap_ret_intra - market_ret_intra[:, np.newaxis, :]
 
     # Split dataset according to dates
     num_date = label_ret.shape[0]
@@ -101,21 +110,21 @@ def extract_2_X():
                    ask_order_volume_total[:train_split], bid_order_volume_total[:train_split], volume[:train_split],
                    adj_close[:train_split], adj_pre_close[:train_split], adj_vwap[:train_split],
                    amount_ask[:train_split], amount_bid[:train_split]],
-                  label_ret[:train_split]]
+                  [label_ret[:train_split], label_ret_intra[:train_split]]]
 
     valid_data = [[st_state[train_split:test_split],
                    ask_order_volume_total[train_split:test_split], bid_order_volume_total[train_split:test_split],
                    volume[train_split:test_split], adj_close[train_split:test_split],
                    adj_pre_close[train_split:test_split], adj_vwap[train_split:test_split],
                    amount_ask[train_split:test_split], amount_bid[train_split:test_split]],
-                  label_ret[train_split:test_split]]
+                  [label_ret[train_split:test_split], label_ret_intra[train_split:test_split]]]
 
     # For only label_ret, the first axis is not the same as the features (-1)
     test_data = [[st_state[test_split:-1],
                   ask_order_volume_total[test_split:-1], bid_order_volume_total[test_split:-1], volume[test_split:-1],
                   adj_close[test_split:-1], adj_pre_close[test_split:-1], adj_vwap[test_split:-1],
                   amount_ask[test_split:-1], amount_bid[test_split:-1]],
-                 label_ret[test_split:]]
+                 [label_ret[test_split:], label_ret_intra[test_split:-1]]]
 
     train_date = dates[:train_split]
     valid_date = dates[train_split:test_split]
@@ -124,10 +133,10 @@ def extract_2_X():
 
 
 def X_cut(raw_data, size):
-    features, label_ret = raw_data
+    features, label_rets = raw_data
     st_state = features[0]
     nd, nt = st_state.shape
-    X, Y = [], []
+    X, Y, Y_intra = [], [], []
     for t in range(nt):
         if t % 300 == 0:
             print('Now stock', t, dt.datetime.now())
@@ -140,17 +149,23 @@ def X_cut(raw_data, size):
                     slice = item[date:(date + size), t].reshape(-1)
 
                     # if there is any data is np.nan, then next
-                    if np.sum(np.isnan(slice)) > 0:
+                    if np.isnan(np.sum(slice)):
                         flag = True
                         break
                     res.append(slice)
 
                 # if there is any return data is np.nan, then next
-                vwap_ret = label_ret[date+size-1, t, -1]
-                if not flag and not np.isnan(vwap_ret):
+                vwap_ret = label_rets[0][date+size-1, t]
+                vwap_ret_intra = label_rets[1][date+size-1, t]
+
+                # Not np.nan
+                # Y: the return of interday return for every bar
+                # Y_intra: the return of intraday return for every bar (compared to that day's last bar)
+                if not (flag or np.isnan(np.sum(vwap_ret)) or np.isnan(np.sum(vwap_ret_intra))):
                     X.append(np.vstack(res))
                     Y.append(vwap_ret)
-    return np.array(X), np.array(Y)
+                    Y_intra.append(vwap_ret_intra)
+    return np.array(X), np.array(Y), np.array(Y_intra)
 
 
 # ele data structure:
@@ -175,8 +190,27 @@ def ele_normalize(ele, full):
     return X.T
 
 
-def dataset_normalize(dataset, full=False):
-    data_X, data_Y = dataset
+def dataset_normalize(dataset, intra, start_bar, full=False):
+    intra, bar = int(intra), int(start_bar)
+    if bar < 0 or bar > 15:
+        print('Failed in Normalization because start_bar =', bar)
+        return
+
+    if intra == 0:
+        # predict interday return
+        Y_select = 1
+    else:
+        # predict intraday return
+        Y_select = 2
+
+    if bar == 15:
+        # predict the last bar
+        data_X, data_Y = dataset[0], dataset[Y_select][:, bar]
+    else:
+        # predict the other bars
+        last_bar = 15 - bar
+        data_X, data_Y = dataset[0][:,:,:-last_bar], dataset[Y_select][:, bar]
+
     res_X = []
     for ele in data_X:
         res_X.append(ele_normalize(ele, full))

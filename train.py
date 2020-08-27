@@ -59,34 +59,12 @@ def get_perform(model, test_data):
     return loss, IC
 
 
-# read model and get its perform
-def perform(size, batch_size, init_lr, mode):
-    log_path = 'logs/' + '_'.join([size, batch_size, init_lr]) + '/'
-    try:
-        with open('data/size' + size + '.pkl', 'rb') as file:
-            tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = pickle.load(file)
-    except:
-        print('Data not prepared!')
-        return
-
-    test_data = Data_Process.dataset_normalize(test_data)
-    if mode == 'cnn':
-        model = tf.keras.models.load_model(log_path + 'CNN_model.h5', custom_objects={'IC': Model.IC})
-    else:
-        model = tf.keras.models.load_model(log_path + 'LSTM_model.h5', custom_objects={'IC': Model.IC})
-
-    with open(log_path + mode + '_history.pkl', 'rb') as file:
-        history, _, _, _, _ = pickle.load(file)
-
-    test_loss, test_metrics = get_perform(model, test_data)
-    plot_history(history, test_loss, test_metrics, mode, log_path)
-
-
 def main(inputs):
-    size, batch_size, init_lr, mode = inputs
+    size, batch_size, init_lr, intra, start_bar, mode = inputs
     log_path = 'logs/' + '_'.join(inputs[:-1]) + '/'
     batch_size = int(batch_size)
     init_lr = 10 ** (-int(init_lr))
+
     try:
         with open('data/size' + size + '.pkl', 'rb') as file:
             tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = pickle.load(file)
@@ -96,9 +74,10 @@ def main(inputs):
             pickle.dump((tickers, train_date, valid_date, test_date, train_data, valid_data, test_data), file,
                         protocol=4)
 
-    train_data = Data_Process.dataset_normalize(train_data)
-    valid_data = Data_Process.dataset_normalize(valid_data)
-    test_data = Data_Process.dataset_normalize(test_data)
+    # Dataset select the return label and normalization
+    train_data = Data_Process.dataset_normalize(train_data, intra, start_bar)
+    valid_data = Data_Process.dataset_normalize(valid_data, intra, start_bar)
+    test_data = Data_Process.dataset_normalize(test_data, intra, start_bar)
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
@@ -137,5 +116,5 @@ def main(inputs):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[5]
+    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
     main(sys.argv[1:-1])
