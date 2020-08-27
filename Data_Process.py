@@ -227,7 +227,3 @@ def main(size):
     valid_data = X_cut(valid_data, valid_date, size)
     test_data = X_cut(test_data, test_date, size)
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
-
-
-if __name__ == '__main__':
-    main(4)
