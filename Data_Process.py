@@ -94,11 +94,9 @@ def extract_2_X():
     market_ret = diff_market / market_value[:-1]
     label_ret = vwap_ret - market_ret[:, np.newaxis, :]
 
-    # Get daily stock return and market return
-    vwap_ret_intra = adj_vwap / adj_vwap[:, :, -1][:, :, np.newaxis]
-    vwap_ret_intra = 1 / vwap_ret_intra - 1
-    market_ret_intra = market_value / market_value[:, -1][:, np.newaxis]
-    market_ret_intra = 1 / market_ret_intra - 1
+    # Get intraday stock return and market return
+    vwap_ret_intra = adj_vwap[:, :, -1][:, :, np.newaxis] / adj_vwap - 1
+    market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
     label_ret_intra = vwap_ret_intra - market_ret_intra[:, np.newaxis, :]
 
     # Split dataset according to dates
