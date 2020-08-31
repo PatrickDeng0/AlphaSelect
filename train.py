@@ -72,6 +72,9 @@ def main(inputs):
     size, init_lr, intra, start_bar, activations, modes = inputs
     float_init_lr = 10 ** (-int(init_lr))
 
+    log_path = 'logs/'
+    os.makedirs(log_path, exist_ok=True)
+
     try:
         with open('data/size' + size + '.pkl', 'rb') as file:
             tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = pickle.load(file)
@@ -103,6 +106,7 @@ def main(inputs):
             mode = mod_dict[mod]
             activation = act_dict[act]
             log_path = 'logs/' + '_'.join([size, init_lr, intra, start_bar, act]) + '/'
+            os.makedirs(log_path, exist_ok=True)
 
             if mode == 'cnn':
                 model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
