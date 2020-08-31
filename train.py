@@ -70,7 +70,7 @@ def main(inputs):
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
     size, init_lr, intra, start_bar, activations, modes = inputs
-    init_lr = 10 ** (-int(init_lr))
+    float_init_lr = 10 ** (-int(init_lr))
 
     try:
         with open('data/size' + size + '.pkl', 'rb') as file:
@@ -105,12 +105,12 @@ def main(inputs):
             log_path = 'logs/' + '_'.join([size, init_lr, intra, start_bar, act]) + '/'
 
             if mode == 'cnn':
-                model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=init_lr,
+                model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
                                        num_vr_kernel=32, num_time_kernel=16, num_dense=16,
                                        kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
                                        activation=activation)
             else:
-                model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=init_lr,
+                model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
                                          num_dense=16, activation=activation)
 
             model.load(log_path + mode + '_model.h5')
