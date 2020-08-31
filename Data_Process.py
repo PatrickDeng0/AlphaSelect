@@ -67,7 +67,7 @@ def extract_2_X():
 
     # Find the dates of total dataset
     min_dates = 20160108
-    max_dates = np.min([d_res[1].max(), ticks_res[1].max(), trans_res[1].max()])
+    max_dates = 20181231
     time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
 
     print('d_res shape:', d_res[-1].shape)
@@ -84,20 +84,20 @@ def extract_2_X():
     adj_close = close * adjust_coef[:, :, np.newaxis]
     adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
     adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
-    stock_value = TotalShares[:, :, np.newaxis] * vwap
+    stock_value = TotalShares[:, :, np.newaxis] * close
     market_value = np.nansum(stock_value, axis=1)
 
     # Get daily stock return and market return
-    diff_vwap_day = np.diff(adj_vwap, axis=0)
-    vwap_ret = diff_vwap_day / adj_vwap[:-1]
+    diff_close_day = np.diff(adj_close, axis=0)
+    close_ret = diff_close_day / adj_close[:-1]
     diff_market = np.diff(market_value, axis=0)
     market_ret = diff_market / market_value[:-1]
-    label_ret = vwap_ret - market_ret[:, np.newaxis, :]
+    label_ret = close_ret - market_ret[:, np.newaxis, :]
 
     # Get intraday stock return and market return
-    vwap_ret_intra = adj_vwap[:, :, -1][:, :, np.newaxis] / adj_vwap - 1
+    close_ret_intra = adj_close[:, :, -1][:, :, np.newaxis] / adj_close - 1
     market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
-    label_ret_intra = vwap_ret_intra - market_ret_intra[:, np.newaxis, :]
+    label_ret_intra = close_ret_intra - market_ret_intra[:, np.newaxis, :]
 
     # Split dataset according to dates
     num_date = label_ret.shape[0]

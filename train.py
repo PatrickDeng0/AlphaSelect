@@ -1,6 +1,7 @@
 import Data_Process, Model
 import tensorflow as tf
 import pickle, sys, os
+from multiprocessing import Process
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,11 +43,15 @@ def plot_history(history, test_loss, test_metrics, mode, log_path):
     ax5.legend()
 
     ax6 = fig1.add_subplot(236)
-    ax6.annotate('Test Loss %12f' % test_loss, xy=(3, 4), xytext=(3, 4), size=18)
-    ax6.annotate('Test IC %5f' % test_metrics, xy=(3, 6), xytext=(3, 6), size=18)
-    ax6.set_ylim(bottom=0, top=10)
+    ax6.annotate('Train Loss %12f' % history_df['loss'].values[-1], xy=(3, 11), xytext=(3, 11), size=12)
+    ax6.annotate('Train IC %5f' % history_df['IC'].values[-1], xy=(3, 9), xytext=(3, 9), size=12)
+    ax6.annotate('Valid Loss %12f' % history_df['var_loss'].values[-1], xy=(3, 7), xytext=(3, 7), size=12)
+    ax6.annotate('Valid IC %5f' % history_df['var_IC'].values[-1], xy=(3, 5), xytext=(3, 5), size=12)
+    ax6.annotate('Test Loss %12f' % test_loss, xy=(3, 3), xytext=(3, 3), size=12)
+    ax6.annotate('Test IC %5f' % test_metrics, xy=(3, 1), xytext=(3, 1), size=12)
+    ax6.set_ylim(bottom=0, top=12)
     ax6.set_xlim(left=0, right=10)
-    ax6.set_title('Test Performance')
+    ax6.set_title('Performance')
 
     fig1.savefig(log_path + mode + '_perform.jpeg')
 
@@ -60,9 +65,11 @@ def get_perform(model, test_data):
 
 
 def main(inputs):
-    size, batch_size, init_lr, intra, start_bar, mode = inputs
-    log_path = 'logs/' + '_'.join(inputs[:-1]) + '/'
-    batch_size = int(batch_size)
+    # For select model and activation function
+    mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm'}
+    act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
+
+    size, init_lr, intra, start_bar, activations, modes = inputs
     init_lr = 10 ** (-int(init_lr))
 
     try:
@@ -85,34 +92,41 @@ def main(inputs):
     print('GPU working', tf.test.is_gpu_available())
 
     input_shape = train_data[0].shape[1:]
+    batch_size = 10000
     train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
     valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
     test_data_tf = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
-    if mode == 'cnn':
-        model = Model.CNN_Pred(input_shape, learning_rate=init_lr,
-                               num_vr_kernel=64, num_time_kernel=16, num_dense=16,
-                               kernel_size=(3,1), pool_size=(2,1))
-        model.load(log_path + 'CNN_model.h5')
-    else:
-        model = Model.LSTM_model(input_shape=input_shape, learning_rate=init_lr, num_dense=16)
-        model.load(log_path + 'LSTM_model.h5')
-    model.summary()
+    for mod in modes:
+        for act in activations:
 
-    print('LR before training:', model._model.optimizer.lr.numpy())
-    history = model.fit(train_data, valid_data, epochs=100, filepath=log_path)
+            mode = mod_dict[mod]
+            activation = act_dict[act]
+            log_path = 'logs/' + '_'.join([size, init_lr, intra, start_bar, act]) + '/'
 
-    print('LR after training:', model._model.optimizer.lr.numpy())
-    test_loss, test_metrics = model.evaluate(test_data_tf)
-    print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+            if mode == 'cnn':
+                model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=init_lr,
+                                       num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                       kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                       activation=activation)
+            else:
+                model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=init_lr,
+                                         num_dense=16, activation=activation)
 
-    test_LOSS, test_IC = get_perform(model, test_data)
-    print('Self test!')
-    print('Test Loss', test_LOSS, 'Test Metrics', test_IC)
+            model.load(log_path + mode + '_model.h5')
+            model.summary()
 
-    plot_history(history, test_LOSS, test_IC, mode, log_path)
-    with open(log_path + mode + '_history.pkl', 'wb') as file:
-        pickle.dump((history.history, test_loss, test_metrics, test_LOSS, test_IC), file)
+            history = model.fit(train_data, valid_data, epochs=3, filepath=log_path)
+            test_loss, test_metrics = model.evaluate(test_data_tf)
+            print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+
+            # test_LOSS, test_IC = get_perform(model, test_data)
+            # print('Self test!')
+            # print('Test Loss', test_LOSS, 'Test Metrics', test_IC)
+
+            plot_history(history, test_loss, test_metrics, mode, log_path)
+            with open(log_path + mode + '_history.pkl', 'wb') as file:
+                pickle.dump((history.history, test_loss, test_metrics, test_loss, test_metrics), file)
 
 
 if __name__ == '__main__':
