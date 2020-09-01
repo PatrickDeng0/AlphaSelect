@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.keras as tk
 import tensorflow.keras.backend as K
+from tcn import TCN, tcn_full_summary
 
 
 def IC(y_true, y_pred):
@@ -29,7 +30,10 @@ class Model:
         pass
 
     def summary(self):
-        self._model.summary()
+        if self._mode == 'tcn':
+            tcn_full_summary(self._model)
+        else:
+            self._model.summary()
 
     def change_LR(self, learningrate):
         self._learning_rate = learningrate
@@ -75,17 +79,18 @@ class CNN_Pred(Model):
         self._conv_layer = self._get_conv_layer()
 
     def _get_conv_layer(self):
-        time_shape, ks, ps, strides = self._input_shape[0], self._kernel_size[0]-1, self._pool_size[0], self._strides[0]
-        res = 0
-        while True:
-            time_shape = time_shape // strides
-            print(time_shape)
-            time_shape = time_shape // ps
-            print(time_shape)
-            res += 1
-            if time_shape < 8:
-                break
-        return res
+        # time_shape, ks, ps, strides = self._input_shape[0], self._kernel_size[0]-1, self._pool_size[0], self._strides[0]
+        # res = 0
+        # while True:
+        #     time_shape = time_shape // strides
+        #     print(time_shape)
+        #     time_shape = time_shape // ps
+        #     print(time_shape)
+        #     res += 1
+        #     if time_shape < 8:
+        #         break
+        # return res
+        return 2
 
     def _build_model(self):
         inputs = tk.layers.Input(shape=self._input_shape)
@@ -125,6 +130,25 @@ class LSTM_Model(Model):
             model.add(tf.keras.layers.LSTM(units=self._num_dense, input_shape=self._input_shape))
         model.add(tf.keras.layers.Dense(units=self._num_dense, activation=self._activation))
         model.add(tf.keras.layers.Dense(units=1))
+        model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC])
+        self._model = model
+
+
+class TCN_Model(Model):
+    def __init__(self, mode, input_shape, learning_rate=0.001, num_dense=16, activation='relu'):
+        super().__init__(mode, learning_rate, activation)
+        self._input_shape = input_shape
+        self._num_dense = num_dense
+
+    def _build_model(self):
+        inputs = tk.layers.Input(shape=self._input_shape)
+
+        # TCN layer
+        x = TCN(return_sequences=False, nb_filters=self._num_dense, activation=self._activation)(inputs)
+        output = tk.layers.Dense(1)(x)
+        model = tk.Model(inputs=inputs, outputs=output)
+
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
                       loss=tk.losses.MeanSquaredError(), metrics=[IC])
         self._model = model

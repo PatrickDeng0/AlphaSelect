@@ -66,7 +66,7 @@ def get_perform(model, test_data):
 
 def main(inputs):
     # For select model and activation function
-    mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm'}
+    mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
     size, init_lr, intra, start_bar, activations, modes = inputs
@@ -113,6 +113,10 @@ def main(inputs):
                                        num_vr_kernel=32, num_time_kernel=16, num_dense=16,
                                        kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
                                        activation=activation)
+            elif mode == 'tcn':
+                model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                        num_dense=16, activation=activation)
+
             else:
                 model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
                                          num_dense=16, activation=activation)
@@ -136,3 +140,5 @@ def main(inputs):
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
     main(sys.argv[1:-1])
+
+# nohup python3 train.py 4 3 0 15 rt btlc > /dev/null 2>&1 &

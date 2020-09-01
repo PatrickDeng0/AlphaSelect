@@ -84,7 +84,10 @@ def extract_2_X():
     adj_close = close * adjust_coef[:, :, np.newaxis]
     adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
     adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
-    stock_value = TotalShares[:, :, np.newaxis] * close
+
+    # There are many days when close prices are strange! too much to count
+    # So I use vwap
+    stock_value = TotalShares[:, :, np.newaxis] * vwap
     market_value = np.nansum(stock_value, axis=1)
 
     # Get daily stock return and market return
@@ -179,7 +182,7 @@ def X_cut(raw_data, dates, size, train=False):
 def ele_normalize(ele, full):
     volume_total = ele[0] + ele[1]
     amount_total = ele[6] + ele[7]
-    stand_price, stand_val, stand_volume = ele[5].mean(), ele[7].mean(), ele[2].mean()
+    stand_price, stand_val, stand_volume = ele[3].mean(), ele[7].mean(), ele[2].mean()
     if full:
         X = np.vstack([ele[0]/volume_total - 0.5, ele[1]/volume_total - 0.5, ele[2]/stand_volume - 1,
                        ele[3]/stand_price - 1, ele[4]/stand_price - 1, ele[5]/stand_price - 1,
@@ -206,13 +209,14 @@ def dataset_normalize(dataset, intra, start_bar, full=False):
         # predict intraday return
         Y_select = 2
 
+    # So now data normalize will reduce the time dimension by 16
     if bar == 15:
         # predict the last bar
-        data_X, data_Y = dataset[0], dataset[Y_select][:, bar]
+        data_X, data_Y = dataset[0][:,:,(bar+1):], dataset[Y_select][:, bar]
     else:
         # predict the other bars
         last_bar = 15 - bar
-        data_X, data_Y = dataset[0][:,:,:-last_bar], dataset[Y_select][:, bar]
+        data_X, data_Y = dataset[0][:,:,(bar+1):-last_bar], dataset[Y_select][:, bar]
 
     res_X = []
     for ele in data_X:
@@ -223,7 +227,11 @@ def dataset_normalize(dataset, intra, start_bar, full=False):
 def main(size):
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = extract_2_X()
     print('Extract Finish!')
-    train_data = X_cut(train_data, train_date, size, train=True)
-    valid_data = X_cut(valid_data, valid_date, size)
-    test_data = X_cut(test_data, test_date, size)
+    train_data = X_cut(train_data, train_date, size+1, train=True)
+    valid_data = X_cut(valid_data, valid_date, size+1)
+    test_data = X_cut(test_data, test_date, size+1)
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
+
+
+if __name__ == '__main__':
+    main(4)
