@@ -91,9 +91,7 @@ def extract_2_X():
     market_value = np.nansum(stock_value, axis=1)
     diff_market = np.diff(market_value, axis=0)
     market_ret = diff_market / market_value[:-1]
-    market_ret = market_ret[:, np.newaxis, :]
     market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
-    market_ret_intra = market_ret_intra[:, np.newaxis, :]
 
     # Get vwap stock return and market return (interday and intraday)
     diff_vwap_day = np.diff(adj_vwap, axis=0)
@@ -115,8 +113,8 @@ def extract_2_X():
                    adj_close[:train_split], adj_pre_close[:train_split], adj_vwap[:train_split],
                    amount_ask[:train_split], amount_bid[:train_split]],
                   np.array([vwap_ret[:train_split], vwap_ret_intra[:train_split],
-                            close_ret[:train_split], close_ret_intra[:train_split],
-                            market_ret[:train_split], market_ret_intra[:train_split]])]
+                            close_ret[:train_split], close_ret_intra[:train_split]]),
+                  np.array([market_ret[:train_split], market_ret_intra[:train_split]])]
 
     valid_data = [[st_state[train_split:test_split],
                    ask_order_volume_total[train_split:test_split], bid_order_volume_total[train_split:test_split],
@@ -124,8 +122,8 @@ def extract_2_X():
                    adj_pre_close[train_split:test_split], adj_vwap[train_split:test_split],
                    amount_ask[train_split:test_split], amount_bid[train_split:test_split]],
                   np.array([vwap_ret[train_split:test_split], vwap_ret_intra[train_split:test_split],
-                            close_ret[train_split:test_split], close_ret_intra[train_split:test_split],
-                            market_ret[train_split:test_split], market_ret_intra[train_split:test_split]])]
+                            close_ret[train_split:test_split], close_ret_intra[train_split:test_split]]),
+                  np.array([market_ret[train_split:test_split], market_ret_intra[train_split:test_split]])]
 
     # For only label_ret, the first axis is not the same as the features (-1)
     test_data = [[st_state[test_split:-1],
@@ -133,8 +131,8 @@ def extract_2_X():
                   adj_close[test_split:-1], adj_pre_close[test_split:-1], adj_vwap[test_split:-1],
                   amount_ask[test_split:-1], amount_bid[test_split:-1]],
                  np.array([vwap_ret[test_split:], vwap_ret_intra[test_split:-1],
-                           close_ret[test_split:], close_ret_intra[test_split:-1],
-                           market_ret[test_split:], market_ret_intra[test_split:-1]])]
+                           close_ret[test_split:], close_ret_intra[test_split:-1]]),
+                 np.array([market_ret[test_split:], market_ret_intra[test_split:-1]])]
 
     train_date = dates[:train_split]
     valid_date = dates[train_split:test_split]
@@ -143,22 +141,22 @@ def extract_2_X():
 
 
 # Somedays there are not valid returns
-def check_mistake_rets(rets):
-    if np.isnan(np.sum(rets)) or np.max(np.abs(rets[4:])) > 0.5:
+def check_mistake_rets(rets, m_rets):
+    if np.isnan(np.sum(rets)) or np.isnan(np.sum(m_rets)) or np.max(np.abs(m_rets)) > 0.5:
         return True
     return False
 
 
-def rets_divides(rets):
-    rets[0] = rets[0] - rets[4]
-    rets[1] = rets[1] - rets[5]
-    rets[2] = rets[2] - rets[4]
-    rets[3] = rets[3] - rets[5]
-    return rets[:4]
+def rets_divides(rets, m_rets):
+    rets[0] = rets[0] - m_rets[0]
+    rets[1] = rets[1] - m_rets[1]
+    rets[2] = rets[2] - m_rets[0]
+    rets[3] = rets[3] - m_rets[1]
+    return rets
 
 
 def X_cut(raw_data, size, train=False):
-    features, label_rets = raw_data
+    features, stock_rets, market_rets = raw_data
     st_state = features[0]
     nd, nt = st_state.shape
     X, Y = [], []
@@ -184,11 +182,13 @@ def X_cut(raw_data, size, train=False):
                         break
                     res.append(slice)
 
-                rets = label_rets[:, date+size-1, t]
+                rets = stock_rets[:, date+size-1, t]
+                m_rets = market_rets[:, date+size-1]
+
                 # Judge whether record this data
-                if not (flag or check_mistake_rets(rets)):
+                if not (flag or check_mistake_rets(rets, m_rets)):
                     X.append(np.vstack(res))
-                    Y.append(rets_divides(rets))
+                    Y.append(rets_divides(rets, m_rets))
     return np.array(X), np.array(Y)
 
 
@@ -252,4 +252,4 @@ def main(size):
 
 
 if __name__ == '__main__':
-    main(4)
+    main(2)
