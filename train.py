@@ -14,7 +14,7 @@ def plot_history(history, test_loss, test_metrics, mode, log_path):
         history_df = pd.DataFrame(history)
 
     # fig1: Loss function and IC changes during training
-    fig1 = plt.figure(1, figsize=(18,12))
+    fig1 = plt.figure(figsize=(18,12))
     ax1 = fig1.add_subplot(231)
     ax1.plot(history_df['loss'], label='train loss')
     ax1.set_title('Train Loss')
@@ -26,7 +26,7 @@ def plot_history(history, test_loss, test_metrics, mode, log_path):
     ax2.legend()
 
     ax3 = fig1.add_subplot(233)
-    ax3.semilogy(history_df['lr'])
+    ax3.semilogy(history_df['lr'], label='lr')
     ax3.set_title('Learning Rate')
     ax3.legend()
 
@@ -124,7 +124,7 @@ def main(inputs):
             model.load(log_path + mode + '_model.h5')
             model.summary()
 
-            history = model.fit(train_data, valid_data, epochs=3, filepath=log_path)
+            history = model.fit(train_data, valid_data, epochs=50, filepath=log_path)
             test_loss, test_metrics = model.evaluate(test_data_tf)
             print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
