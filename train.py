@@ -69,7 +69,7 @@ def main(inputs):
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
-    size, init_lr, intra, start_bar, activations, modes = inputs
+    size, init_lr, select, start_bar, activations, modes = inputs
     float_init_lr = 10 ** (-int(init_lr))
 
     log_path = 'logs/'
@@ -85,9 +85,9 @@ def main(inputs):
                         protocol=4)
 
     # Dataset select the return label and normalization
-    train_data = Data_Process.dataset_normalize(train_data, intra, start_bar)
-    valid_data = Data_Process.dataset_normalize(valid_data, intra, start_bar)
-    test_data = Data_Process.dataset_normalize(test_data, intra, start_bar)
+    train_data = Data_Process.dataset_normalize(train_data, select, start_bar)
+    valid_data = Data_Process.dataset_normalize(valid_data, select, start_bar)
+    test_data = Data_Process.dataset_normalize(test_data, select, start_bar)
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
@@ -105,7 +105,7 @@ def main(inputs):
 
             mode = mod_dict[mod]
             activation = act_dict[act]
-            log_path = 'logs/' + '_'.join([size, init_lr, intra, start_bar, act]) + '/'
+            log_path = 'logs/' + '_'.join([size, init_lr, select, start_bar]) + '/' + act + '/'
             os.makedirs(log_path, exist_ok=True)
 
             if mode == 'cnn':
