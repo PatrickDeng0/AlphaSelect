@@ -141,4 +141,3 @@ if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
     main(sys.argv[1:-1])
 
-# nohup python3 train.py 4 3 0 15 rt btlc 0 > /dev/null 2>&1 &
