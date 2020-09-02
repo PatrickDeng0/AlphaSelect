@@ -1,6 +1,8 @@
 import numpy as np
 import h5py
 import datetime as dt
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def mat_reader(filename):
@@ -87,24 +89,31 @@ def extract_2_X():
 
     # There are many days when close prices are strange! too much to count
     # So I use vwap
-    stock_value = TotalShares[:, :, np.newaxis] * vwap
-    market_value = np.nansum(stock_value, axis=1)
-    diff_market = np.diff(market_value, axis=0)
-    market_ret = diff_market / market_value[:-1]
-    market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
+    # stock_value = TotalShares[:, :, np.newaxis] * vwap
+    # market_value = np.nansum(stock_value, axis=1)
+    # diff_market = np.diff(market_value, axis=0)
+    # market_ret = diff_market / market_value[:-1]
+    # market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
 
     # Get vwap stock return and market return (interday and intraday)
-    diff_vwap_day = np.diff(adj_vwap, axis=0)
-    vwap_ret = diff_vwap_day / adj_vwap[:-1]
-    vwap_ret_intra = adj_vwap[:, :, -1][:, :, np.newaxis] / adj_vwap - 1
+    # diff_vwap_day = np.diff(adj_vwap, axis=0)
+    # vwap_ret = diff_vwap_day / adj_vwap[:-1]
+    # vwap_ret_intra = adj_vwap[:, :, -1][:, :, np.newaxis] / adj_vwap - 1
 
-    # Get daily stock return and market return
+    # Get daily and intraday stock return
     diff_close_day = np.diff(adj_close, axis=0)
     close_ret = diff_close_day / adj_close[:-1]
     close_ret_intra = adj_close[:, :, -1][:, :, np.newaxis] / adj_close - 1
 
+    # Get close daily and intraday market return (interday and intraday)
+    stock_value = TotalShares * pclse
+    market_value = np.nansum(stock_value, axis=1)
+    stock_weights = stock_value / market_value[:, np.newaxis]
+    market_ret = np.nansum(close_ret * stock_weights[1:, :, np.newaxis], axis=1)
+    market_ret_intra = np.nansum(close_ret_intra * stock_weights[:, :, np.newaxis], axis=1)
+
     # Split dataset according to dates
-    num_date = vwap_ret.shape[0]
+    num_date = close_ret.shape[0]
     train_split = np.int(num_date * 0.8)
     test_split = np.int(num_date * 0.9)
 
@@ -112,8 +121,7 @@ def extract_2_X():
                    ask_order_volume_total[:train_split], bid_order_volume_total[:train_split], volume[:train_split],
                    adj_close[:train_split], adj_pre_close[:train_split], adj_vwap[:train_split],
                    amount_ask[:train_split], amount_bid[:train_split]],
-                  np.array([vwap_ret[:train_split], vwap_ret_intra[:train_split],
-                            close_ret[:train_split], close_ret_intra[:train_split]]),
+                  np.array([close_ret[:train_split], close_ret_intra[:train_split]]),
                   np.array([market_ret[:train_split], market_ret_intra[:train_split]])]
 
     valid_data = [[st_state[train_split:test_split],
@@ -121,8 +129,7 @@ def extract_2_X():
                    volume[train_split:test_split], adj_close[train_split:test_split],
                    adj_pre_close[train_split:test_split], adj_vwap[train_split:test_split],
                    amount_ask[train_split:test_split], amount_bid[train_split:test_split]],
-                  np.array([vwap_ret[train_split:test_split], vwap_ret_intra[train_split:test_split],
-                            close_ret[train_split:test_split], close_ret_intra[train_split:test_split]]),
+                  np.array([close_ret[train_split:test_split], close_ret_intra[train_split:test_split]]),
                   np.array([market_ret[train_split:test_split], market_ret_intra[train_split:test_split]])]
 
     # For only label_ret, the first axis is not the same as the features (-1)
@@ -130,8 +137,7 @@ def extract_2_X():
                   ask_order_volume_total[test_split:-1], bid_order_volume_total[test_split:-1], volume[test_split:-1],
                   adj_close[test_split:-1], adj_pre_close[test_split:-1], adj_vwap[test_split:-1],
                   amount_ask[test_split:-1], amount_bid[test_split:-1]],
-                 np.array([vwap_ret[test_split:], vwap_ret_intra[test_split:-1],
-                           close_ret[test_split:], close_ret_intra[test_split:-1]]),
+                 np.array([close_ret[test_split:], close_ret_intra[test_split:-1]]),
                  np.array([market_ret[test_split:], market_ret_intra[test_split:-1]])]
 
     train_date = dates[:train_split]
@@ -142,17 +148,10 @@ def extract_2_X():
 
 # Somedays there are not valid returns
 def check_mistake_rets(rets, m_rets):
-    if np.isnan(np.sum(rets)) or np.isnan(np.sum(m_rets)) or np.max(np.abs(m_rets)) > 0.5:
+    if np.isnan(np.sum(rets)) or np.max(np.abs(rets)) > 0.22 \
+            or np.isnan(np.sum(m_rets)) or np.max(np.abs(m_rets)) > 0.22:
         return True
     return False
-
-
-def rets_divides(rets, m_rets):
-    rets[0] = rets[0] - m_rets[0]
-    rets[1] = rets[1] - m_rets[1]
-    rets[2] = rets[2] - m_rets[0]
-    rets[3] = rets[3] - m_rets[1]
-    return rets
 
 
 def X_cut(raw_data, size, train=False):
@@ -173,13 +172,17 @@ def X_cut(raw_data, size, train=False):
             # Not ST, and not trading halt!
             if np.sum(st_series[date:(date+size)]) == 0:
                 res, flag = [], False
-                for item in features[1:]:
+                for i in range(1, len(features)):
+                    item = features[i]
                     slice = item[date:(date + size), t].reshape(-1)
 
-                    # if there is any data is np.nan, then next
-                    if np.isnan(np.sum(slice)):
+                    # if there is any data for ticks is np.nan, then next
+                    # if ticks data is alright, then fill the nan to 0.0 for amount_bid or amount_ask data
+                    if i < len(features) - 2 and np.isnan(np.sum(slice)):
                         flag = True
                         break
+                    else:
+                        slice = np.nan_to_num(slice)
                     res.append(slice)
 
                 rets = stock_rets[:, date+size-1, t]
@@ -188,7 +191,7 @@ def X_cut(raw_data, size, train=False):
                 # Judge whether record this data
                 if not (flag or check_mistake_rets(rets, m_rets)):
                     X.append(np.vstack(res))
-                    Y.append(rets_divides(rets, m_rets))
+                    Y.append(rets - m_rets)
     return np.array(X), np.array(Y)
 
 
@@ -220,21 +223,16 @@ def dataset_normalize(dataset, select, start_bar, full=False):
         print('Failed in Normalization because start_bar =', bar)
         return
 
+    # Y_select == 0: predict interday return; == 1: predict intraday return
     # So now data normalize will reduce the time dimension by 16
     data_Y = dataset[1][:, Y_select, bar]
     if bar == 15:
         # predict the last bar
-        if Y_select < 2:
-            data_X  = dataset[0][:, :, bar:-1]
-        else:
-            data_X = dataset[0][:, :, (bar+1):]
+        data_X = dataset[0][:, :, (bar+1):]
     else:
         # predict the other bars
         last_bar = 15 - bar
-        if Y_select < 2:
-            data_X = dataset[0][:, :, bar:-(last_bar+1)]
-        else:
-            data_X = dataset[0][:, :, (bar+1):-last_bar]
+        data_X = dataset[0][:, :, (bar+1):-last_bar]
 
     res_X = []
     for ele in data_X:
@@ -252,4 +250,31 @@ def main(size):
 
 
 if __name__ == '__main__':
-    main(2)
+    tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = main(2)
+    fig = plt.figure(figsize=(18,6))
+    ax1 = fig.add_subplot(131)
+    ax1 = sns.distplot(train_data[1][:, 0, :].reshape(-1))
+    ax1.set_title('Train')
+
+    ax2 = fig.add_subplot(132)
+    ax2 = sns.distplot(valid_data[1][:, 0, :].reshape(-1))
+    ax2.set_title('Valid')
+
+    ax3 = fig.add_subplot(133)
+    ax3 = sns.distplot(test_data[1][:, 0, :].reshape(-1))
+    ax3.set_title('Test')
+    fig.savefig('data/interday_ret.jpeg')
+
+    fig = plt.figure(figsize=(18,6))
+    ax1 = fig.add_subplot(131)
+    ax1 = sns.distplot(train_data[1][:, 1, :].reshape(-1))
+    ax1.set_title('Train')
+
+    ax2 = fig.add_subplot(132)
+    ax2 = sns.distplot(valid_data[1][:, 2, :].reshape(-1))
+    ax2.set_title('Valid')
+
+    ax3 = fig.add_subplot(133)
+    ax3 = sns.distplot(test_data[1][:, 3, :].reshape(-1))
+    ax3.set_title('Test')
+    fig.savefig('data/intraday_ret.jpeg')
