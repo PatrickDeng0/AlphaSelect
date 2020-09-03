@@ -1,5 +1,5 @@
 import numpy as np
-import h5py
+import h5py, sys
 import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -178,11 +178,12 @@ def X_cut(raw_data, size, train=False):
 
                     # if there is any data for ticks is np.nan, then next
                     # if ticks data is alright, then fill the nan to 0.0 for amount_bid or amount_ask data
-                    if i < len(features) - 2 and np.isnan(np.sum(slice)):
-                        flag = True
-                        break
+                    if i < len(features) - 2:
+                        if np.isnan(np.sum(slice)):
+                            flag = True
+                            break
                     else:
-                        slice = np.nan_to_num(slice)
+                        slice[np.isnan(slice)] = 1
                     res.append(slice)
 
                 rets = stock_rets[:, date+size-1, t]
@@ -246,11 +247,7 @@ def main(size):
     train_data = X_cut(train_data, size+1, train=True)
     valid_data = X_cut(valid_data, size+1)
     test_data = X_cut(test_data, size+1)
-    return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
 
-
-if __name__ == '__main__':
-    tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = main(2)
     fig = plt.figure(figsize=(18,6))
     ax1 = fig.add_subplot(131)
     ax1 = sns.distplot(train_data[1][:, 0, :].reshape(-1))
@@ -263,7 +260,7 @@ if __name__ == '__main__':
     ax3 = fig.add_subplot(133)
     ax3 = sns.distplot(test_data[1][:, 0, :].reshape(-1))
     ax3.set_title('Test')
-    fig.savefig('data/interday_ret.jpeg')
+    fig.savefig('data/%d_interday_ret.jpeg' % size)
 
     fig = plt.figure(figsize=(18,6))
     ax1 = fig.add_subplot(131)
@@ -271,10 +268,15 @@ if __name__ == '__main__':
     ax1.set_title('Train')
 
     ax2 = fig.add_subplot(132)
-    ax2 = sns.distplot(valid_data[1][:, 2, :].reshape(-1))
+    ax2 = sns.distplot(valid_data[1][:, 1, :].reshape(-1))
     ax2.set_title('Valid')
 
     ax3 = fig.add_subplot(133)
-    ax3 = sns.distplot(test_data[1][:, 3, :].reshape(-1))
+    ax3 = sns.distplot(test_data[1][:, 1, :].reshape(-1))
     ax3.set_title('Test')
-    fig.savefig('data/intraday_ret.jpeg')
+    fig.savefig('data/%d_intraday_ret.jpeg' % size)
+    return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
+
+
+if __name__ == '__main__':
+    main(2)
