@@ -66,7 +66,7 @@ def get_perform(model, test_data):
 
 def main(inputs):
     # For select model and activation function
-    mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn'}
+    mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
     size, init_lr, select, start_bar, activations, modes = inputs
@@ -113,9 +113,16 @@ def main(inputs):
                                        num_vr_kernel=32, num_time_kernel=16, num_dense=16,
                                        kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
                                        activation=activation)
+
             elif mode == 'tcn':
                 model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
                                         num_dense=16, activation=activation)
+
+            elif mode == 'x':
+                model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                      num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                      kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                      activation=activation)
 
             else:
                 model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,

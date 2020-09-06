@@ -13,4 +13,7 @@ python3 train.py %s %s %s %s %s %s %s > %strain.log\
 print(cmd_line)
 os.system(cmd_line)
 
-# nohup python3 main.py 2 3 0 15 rt btlc 0 > /dev/null 2>&1 &
+# nohup python3 main.py 2 3 0 15 rt x 0 > /dev/null 2>&1 &
+# nohup python3 main.py 2 3 1 2 rt btlc 0 > /dev/null 2>&1 &
+# aipaas aistart -u dong -p qwer1234 --image=test --gpu=1 --pod_name=test4
+# python3 train.py 2 3 0 15 rt x 0

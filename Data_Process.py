@@ -236,7 +236,8 @@ def dataset_normalize(dataset, select, start_bar, full=False):
         data_X = dataset[0][:, :, (bar+1):-last_bar]
 
     res_X = []
-    for ele in data_X:
+    for i in range(data_X.shape[0]):
+        ele = data_X[i]
         res_X.append(ele_normalize(ele, full))
     return np.array(res_X), data_Y
 

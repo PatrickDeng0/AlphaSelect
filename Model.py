@@ -124,12 +124,12 @@ class LSTM_Model(Model):
     def _build_model(self):
         model = tk.Sequential()
         if self._mode == 'bilstm':
-            model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(units=self._num_dense),
-                                                    input_shape=self._input_shape))
+            model.add(tk.layers.Bidirectional(tk.layers.LSTM(units=self._num_dense),
+                                              input_shape=self._input_shape))
         else:
-            model.add(tf.keras.layers.LSTM(units=self._num_dense, input_shape=self._input_shape))
-        model.add(tf.keras.layers.Dense(units=self._num_dense, activation=self._activation))
-        model.add(tf.keras.layers.Dense(units=1))
+            model.add(tk.layers.LSTM(units=self._num_dense, input_shape=self._input_shape))
+        model.add(tk.layers.Dense(units=self._num_dense, activation=self._activation))
+        model.add(tk.layers.Dense(units=1))
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
                       loss=tk.losses.MeanSquaredError(), metrics=[IC])
         self._model = model
@@ -149,6 +149,45 @@ class TCN_Model(Model):
         output = tk.layers.Dense(1)(x)
         model = tk.Model(inputs=inputs, outputs=output)
 
+        model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC])
+        self._model = model
+
+
+class X_Model(Model):
+    def __init__(self, mode, input_shape, learning_rate=0.001, num_vr_kernel=64, num_time_kernel=16, num_dense=16,
+                 kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1), activation='relu'):
+        super().__init__(mode, learning_rate, activation)
+        self._input_shape = input_shape
+        self._num_vr_kernel = num_vr_kernel
+        self._num_time_kernel = num_time_kernel
+        self._num_dense = num_dense
+
+        self._kernel_size = kernel_size
+        self._pool_size = pool_size
+        self._strides = strides
+        self._conv_layer = 2
+
+
+    def _build_model(self):
+        inputs = tk.layers.Input(shape=self._input_shape)
+        re_shape = tuple(list(self._input_shape) + [1])
+        x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation=self._activation)(x)
+
+        for _ in range(self._conv_layer):
+            x = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
+                                 activation=self._activation)(x)
+            max_pool = tk.layers.MaxPool2D(self._pool_size)(x)
+            aver_pool = tk.layers.AvgPool2D(self._pool_size)(x)
+            x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
+
+        x = tk.backend.squeeze(x, axis=2)
+        x = tk.layers.LSTM(units=self._num_dense)(x)
+        x = tk.layers.Dense(units=self._num_dense, activation=self._activation)(x)
+        output = tk.layers.Dense(1)(x)
+
+        model = tk.Model(inputs=inputs, outputs=output)
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
                       loss=tk.losses.MeanSquaredError(), metrics=[IC])
         self._model = model
