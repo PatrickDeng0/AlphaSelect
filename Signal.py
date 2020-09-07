@@ -42,7 +42,7 @@ def get_res(model, size):
         for t in range(num_tickers):
             st_series = st_state[date:(date+size), t]
             if np.sum(st_series) == 0:
-                ele_data = features[:, date:(date + size), t]
+                ele_data = features[:, date:(date + size), t].reshape((input_shape[1], input_shape[0]))
                 if not np.isnan(np.sum(ele_data)):
                     ele_data = Data_Process.ele_normalize(ele_data, full=False)
                 else:
@@ -69,14 +69,18 @@ def main(size):
     model.load('models/' + model_prefix + '_model.h5')
     y_pred, dates, tickers = get_res(model, size)
 
+    tickers_t = []
+    for ticker in tickers:
+        tickers_t.append(ticker.encode())
+
     with h5py.File('models/' + model_prefix + '_signal.h5', 'w') as h5f:
         h5f.create_dataset('signals', data=y_pred)
         h5f.create_dataset('dates', data=dates)
-        h5f.create_dataset('tickers', data=tickers)
+        h5f.create_dataset('tickers', data=tickers_t)
 
 
 if __name__ == '__main__':
     size = int(sys.argv[1])
     main(size)
 
-# nohup python3 Signal.py 4 > /dev/null 2>&1 &
+# nohup python3 Signal.py 6 > models/6.log 2>&1 &
