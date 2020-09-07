@@ -87,19 +87,6 @@ def extract_2_X():
     adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
     adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
 
-    # There are many days when close prices are strange! too much to count
-    # So I use vwap
-    # stock_value = TotalShares[:, :, np.newaxis] * vwap
-    # market_value = np.nansum(stock_value, axis=1)
-    # diff_market = np.diff(market_value, axis=0)
-    # market_ret = diff_market / market_value[:-1]
-    # market_ret_intra = market_value[:, -1][:, np.newaxis] / market_value - 1
-
-    # Get vwap stock return and market return (interday and intraday)
-    # diff_vwap_day = np.diff(adj_vwap, axis=0)
-    # vwap_ret = diff_vwap_day / adj_vwap[:-1]
-    # vwap_ret_intra = adj_vwap[:, :, -1][:, :, np.newaxis] / adj_vwap - 1
-
     # Get daily and intraday stock return
     diff_close_day = np.diff(adj_close, axis=0)
     close_ret = diff_close_day / adj_close[:-1]
@@ -160,8 +147,6 @@ def X_cut(raw_data, size, train=False):
     nd, nt = st_state.shape
     X, Y = [], []
     for t in range(nt):
-        if t % 300 == 0:
-            print('Now stock', t, dt.datetime.now())
         st_series = st_state[:, t]
         for date in range(nd-size+1):
 
