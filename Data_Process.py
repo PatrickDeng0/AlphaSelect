@@ -212,13 +212,21 @@ def dataset_normalize(dataset, select, start_bar, full=False):
     # Y_select == 0: predict interday return; == 1: predict intraday return
     # So now data normalize will reduce the time dimension by 16
     data_Y = dataset[1][:, Y_select, bar]
-    if bar == 15:
-        # predict the last bar
-        data_X = dataset[0][:, :, (bar+1):]
+    if Y_select == 0:
+        if bar == 15:
+            # predict the last bar
+            data_X = dataset[0][:, :, (bar+1):]
+        else:
+            # predict the other bars
+            last_bar = 15 - bar
+            data_X = dataset[0][:, :, (bar+1):-last_bar]
     else:
-        # predict the other bars
-        last_bar = 15 - bar
-        data_X = dataset[0][:, :, (bar+1):-last_bar]
+        if bar == 15:
+            data_X = dataset[0]
+        else:
+            # predict the other bars
+            last_bar = 15 - bar
+            data_X = dataset[0][:, :, :-last_bar]
 
     res_X = []
     for i in range(data_X.shape[0]):

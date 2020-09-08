@@ -41,12 +41,9 @@ def get_res(model, size):
     for date in range(num_dates-size+1):
         for t in range(num_tickers):
             st_series = st_state[date:(date+size), t]
-            if np.sum(st_series) == 0:
-                ele_data = features[:, date:(date + size), t].reshape((input_shape[1], input_shape[0]))
-                if not np.isnan(np.sum(ele_data)):
-                    ele_data = Data_Process.ele_normalize(ele_data, full=False)
-                else:
-                    ele_data = ele_data.T
+            ele_data = features[:, date:(date + size), t].reshape((input_shape[1], input_shape[0]))
+            if np.sum(st_series) == 0 and not np.isnan(np.sum(ele_data)):
+                ele_data = Data_Process.ele_normalize(ele_data, full=False)
             else:
                 ele_data = np.full(input_shape, np.nan)
             dataset.append(ele_data)

@@ -155,7 +155,7 @@ class TCN_Model(Model):
 
 
 class X_Model(Model):
-    def __init__(self, mode, input_shape, learning_rate=0.001, num_vr_kernel=64, num_time_kernel=16, num_dense=16,
+    def __init__(self, mode, input_shape, learning_rate=0.001, num_vr_kernel=32, num_time_kernel=16, num_dense=16,
                  kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1), activation='relu'):
         super().__init__(mode, learning_rate, activation)
         self._input_shape = input_shape
@@ -167,7 +167,6 @@ class X_Model(Model):
         self._pool_size = pool_size
         self._strides = strides
         self._conv_layer = 2
-
 
     def _build_model(self):
         inputs = tk.layers.Input(shape=self._input_shape)
@@ -186,6 +185,57 @@ class X_Model(Model):
         x = tk.layers.LSTM(units=self._num_dense)(x)
         x = tk.layers.Dense(units=self._num_dense, activation=self._activation)(x)
         output = tk.layers.Dense(1)(x)
+
+        model = tk.Model(inputs=inputs, outputs=output)
+        model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
+                      loss=tk.losses.MeanSquaredError(), metrics=[IC])
+        self._model = model
+
+
+class Y_Model(Model):
+    def __init__(self, mode, input_shape, learning_rate=0.001, num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                 kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1), activation='relu'):
+        super().__init__(mode, learning_rate, activation)
+        self._input_shape = input_shape
+        self._num_vr_kernel = num_vr_kernel
+        self._num_time_kernel = num_time_kernel
+        self._num_dense = num_dense
+
+        self._kernel_size = kernel_size
+        self._pool_size = pool_size
+        self._strides = strides
+        self._conv_layer = 2
+
+        self._bar = self._input_shape[0] % 16
+        self._part1_shape = (self._input_shape[0] - self._bar, self._input_shape[1])
+        self._part2_shape = (self._bar, self._input_shape[1])
+
+    def _build_model(self):
+        inputs = tk.layers.Input(shape=self._input_shape)
+        re_shape = tuple(list(self._input_shape) + [1])
+        x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation=self._activation)(x)
+
+        # Divided into 2 parts of input
+        # x1: Daily frequent data
+        # x2: Intraday frequent data
+        x1 = tf.slice(x, [0, 0, 0, 0], [-1, self._part1_shape[0], -1, -1])
+        x2 = tf.slice(x, [0, self._part1_shape[0], 0, 0], [-1, -1, -1, -1])
+
+        # For input1 model: 2 conv-pool, then squeeze and lstm
+        for _ in range(self._conv_layer):
+            x1 = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
+                                  activation=self._activation)(x1)
+            max_pool = tk.layers.MaxPool2D(self._pool_size)(x1)
+            aver_pool = tk.layers.AvgPool2D(self._pool_size)(x1)
+            x1 = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
+        x1 = tk.backend.squeeze(x1, axis=2)
+        _, x1, x1_state = tk.layers.LSTM(units=self._num_dense, return_state=True)(x1)
+
+        x2 = tk.backend.squeeze(x2, axis=2)
+        _, _, pred = tk.layers.LSTM(units=self._num_dense, return_state=True)(x2, initial_state=[x1, x1_state])
+        pred = tk.layers.Dense(units=self._num_dense, activation=self._activation)(pred)
+        output = tk.layers.Dense(1)(pred)
 
         model = tk.Model(inputs=inputs, outputs=output)
         model.compile(optimizer=tk.optimizers.Adam(learning_rate=self._learning_rate),
