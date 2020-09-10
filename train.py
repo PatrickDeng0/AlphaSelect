@@ -69,25 +69,19 @@ def main(inputs):
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x', 'y':'y'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
-    size, init_lr, select, start_bar, activations, modes = inputs
-    float_init_lr = 10 ** (-int(init_lr))
+    size, select, start_bar, activations, modes = inputs
+    float_init_lr = 10 ** (-3)
 
     log_path = 'logs/'
     os.makedirs(log_path, exist_ok=True)
 
-    try:
-        with open('data/size' + size + '.pkl', 'rb') as file:
-            tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = pickle.load(file)
-    except:
-        tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = Data_Process.main(int(size))
-        with open('data/size' + size + '.pkl', 'wb') as file:
-            pickle.dump((tickers, train_date, valid_date, test_date, train_data, valid_data, test_data), file,
-                        protocol=4)
+    tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
+        = Data_Process.main(int(size), int(select), int(start_bar))
 
-    # Dataset select the return label and normalization
-    train_data = Data_Process.dataset_normalize(train_data, select, start_bar)
-    valid_data = Data_Process.dataset_normalize(valid_data, select, start_bar)
-    test_data = Data_Process.dataset_normalize(test_data, select, start_bar)
+    print('Train dates:', train_date[0], train_date[-1])
+    print('Valid dates:', valid_date[0], valid_date[-1])
+    print('Test dates:', test_date[0], test_date[-1])
+    print('=============================================================================')
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
@@ -102,10 +96,14 @@ def main(inputs):
 
     for mod in modes:
         for act in activations:
-
             mode = mod_dict[mod]
             activation = act_dict[act]
-            log_path = 'logs/' + '_'.join([size, init_lr, select, start_bar]) + '/' + act + '/'
+
+            print('=============================================================================')
+            print('=============================================================================')
+            print('Model: %s, Activation: %s' % (mode, activation))
+
+            log_path = 'logs/' + '_'.join([size, select, start_bar]) + '/' + act + '/'
             os.makedirs(log_path, exist_ok=True)
 
             if mode == 'cnn':
@@ -141,16 +139,12 @@ def main(inputs):
             test_loss, test_metrics = model.evaluate(test_data_tf)
             print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
-            # test_LOSS, test_IC = get_perform(model, test_data)
-            # print('Self test!')
-            # print('Test Loss', test_LOSS, 'Test Metrics', test_IC)
-
             plot_history(history, test_loss, test_metrics, mode, log_path)
             with open(log_path + mode + '_history.pkl', 'wb') as file:
-                pickle.dump((history.history, test_loss, test_metrics, test_loss, test_metrics), file)
+                pickle.dump((history.history, test_loss, test_metrics), file)
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
+    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[6]
     main(sys.argv[1:-1])
 

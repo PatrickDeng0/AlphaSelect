@@ -96,11 +96,11 @@ class CNN_Pred(Model):
         inputs = tk.layers.Input(shape=self._input_shape)
         re_shape = tuple(list(self._input_shape) + [1])
         x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
-        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation=self._activation)(x)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation='relu')(x)
 
         for _ in range(self._conv_layer):
             x = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
-                                 activation=self._activation)(x)
+                                 activation='relu')(x)
             max_pool = tk.layers.MaxPool2D(self._pool_size)(x)
             aver_pool = tk.layers.AvgPool2D(self._pool_size)(x)
             x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
@@ -145,7 +145,8 @@ class TCN_Model(Model):
         inputs = tk.layers.Input(shape=self._input_shape)
 
         # TCN layer
-        x = TCN(return_sequences=False, nb_filters=self._num_dense, activation=self._activation)(inputs)
+        x = TCN(return_sequences=False, nb_filters=self._num_dense, activation='relu')(inputs)
+        x = tk.layers.Dense(self._num_dense, activation=self._activation)(x)
         output = tk.layers.Dense(1)(x)
         model = tk.Model(inputs=inputs, outputs=output)
 
@@ -172,11 +173,11 @@ class X_Model(Model):
         inputs = tk.layers.Input(shape=self._input_shape)
         re_shape = tuple(list(self._input_shape) + [1])
         x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
-        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation=self._activation)(x)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation='relu')(x)
 
         for _ in range(self._conv_layer):
             x = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
-                                 activation=self._activation)(x)
+                                 activation='relu')(x)
             max_pool = tk.layers.MaxPool2D(self._pool_size)(x)
             aver_pool = tk.layers.AvgPool2D(self._pool_size)(x)
             x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
@@ -214,7 +215,7 @@ class Y_Model(Model):
         inputs = tk.layers.Input(shape=self._input_shape)
         re_shape = tuple(list(self._input_shape) + [1])
         x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
-        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation=self._activation)(x)
+        x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation='relu')(x)
 
         # Divided into 2 parts of input
         # x1: Daily frequent data
@@ -225,7 +226,7 @@ class Y_Model(Model):
         # For input1 model: 2 conv-pool, then squeeze and lstm
         for _ in range(self._conv_layer):
             x1 = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
-                                  activation=self._activation)(x1)
+                                  activation='relu')(x1)
             max_pool = tk.layers.MaxPool2D(self._pool_size)(x1)
             aver_pool = tk.layers.AvgPool2D(self._pool_size)(x1)
             x1 = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])

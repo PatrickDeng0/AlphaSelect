@@ -22,7 +22,7 @@ def collect(df_dict):
                 if item.endswith('.pkl'):
                     model_name = item.split('_')[0]
                     with open('logs/' + hy_param + '/' + act_hy_param + '/' + item, 'rb') as file:
-                        history, test_loss, test_metrics, test_loss, test_metrics = pickle.load(file)
+                        history, test_loss, test_metrics = pickle.load(file)
                     history_df = pd.DataFrame(history)
                     insert = [int(hypers[0]), mode_dict[hypers[2]], hypers[3], act_dict[act_hy_param],
                               history_df['IC'].values[-1], history_df['val_IC'].values[-1], test_metrics]
