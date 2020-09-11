@@ -62,7 +62,7 @@ def time_cut(d_res, ticks_res, trans_res, min_dates, max_dates):
     index_cut(trans_res, res_trans_dates, daily=False)
 
 
-def extract_2_X():
+def extract_2_X(size, Y_select, bar):
     d_res = mat_reader('data/Raw.mat')
     ticks_res = ticks_reader('data/w_data_ticks_15min.h5')
     trans_res = trans_reader('data/w_data_trans_15min.h5')
@@ -90,12 +90,13 @@ def extract_2_X():
     clse[daily_ret_mistake] = np.nan
     pclse[daily_ret_mistake] = np.nan
     AdjustClse[daily_ret_mistake] = np.nan
-    daily_ret = clse / pclse - 1
 
     close[np.where(np.abs(close / pclse[:,:,np.newaxis] - 1) > 0.11)] = np.nan
     pre_close[np.where(np.abs(pre_close / pclse[:,:,np.newaxis] - 1) > 0.11)] = np.nan
     vwap[np.where(np.abs(vwap / pclse[:,:,np.newaxis] - 1) > 0.11)] = np.nan
-    trade_state = (np.abs(daily_ret) < 0.095)
+
+    # Judge whether that bar is trade limit (If so, exclude from market return)
+    bar_trade_limit = (np.abs(close / pre_close[:,:,0][:,:,np.newaxis] - 1) < 0.095)
 
     # calculate the adjuested price, market value
     adjust_coef = AdjustClse / clse
@@ -104,16 +105,19 @@ def extract_2_X():
     adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
 
     # Get daily and intraday stock return
-    close_ret = (adj_close[1:] / adj_pre_close[1:,:,0][:,:,np.newaxis]) * \
-                (adj_close[:-1,:,-1][:,:,np.newaxis] / adj_close[:-1]) - 1
-    close_ret_intra = adj_close[:, :, -1][:, :, np.newaxis] / adj_close - 1
+    close_ret = (close[1:] / pre_close[1:,:,0][:,:,np.newaxis]) * \
+                (close[:-1,:,-1][:,:,np.newaxis] / close[:-1]) - 1
+    close_ret_intra = close[:, :, -1][:, :, np.newaxis] / close - 1
 
     # Get close daily and intraday market return (interday and intraday)
     stock_value = TotalShares * pclse
     market_value = np.nansum(stock_value, axis=1)
     stock_weights = stock_value / market_value[:, np.newaxis]
-    market_ret = np.nansum(close_ret * stock_weights[1:, :, np.newaxis], axis=1)
-    market_ret_intra = np.nansum(close_ret_intra * stock_weights[:, :, np.newaxis], axis=1)
+    market_ret = np.nansum(close_ret * bar_trade_limit[:-1] * stock_weights[1:, :, np.newaxis], axis=1)
+    market_ret_intra = np.nansum(close_ret_intra * bar_trade_limit * stock_weights[:, :, np.newaxis], axis=1)
+
+    # Get whether is able to trade
+    trade_state = bar_trade_limit[:, :, bar]
 
     # Split dataset according to dates
     num_date = close_ret.shape[0]
@@ -135,8 +139,10 @@ def X_cut(dataset, start, end, size, Y_select, bar):
                                                dataset[2][Y_select,start:end,:,bar], dataset[3][Y_select,start:end,bar]
     rets = stock_rets - market_rets[:, np.newaxis]
     st_state, trade_state = daily[0], daily[1]
+    input_shape = (16*size+bar+1, 8)
     nd, nt = st_state.shape
     X, Y = [], []
+    signal_X = []
     for date in range(nd-size):
         for t in range(nt):
             st_series = st_state[date:(date+size+1), t]
@@ -150,8 +156,14 @@ def X_cut(dataset, start, end, size, Y_select, bar):
                     not np.isnan(np.sum(ele_data)) and not np.isnan(date_rets):
                 ele_data = ele_normalize(ele_data, full=False)
                 X.append(ele_data)
+                signal_X.append(ele_data)
                 Y.append(date_rets)
-    return np.array(X), np.array(Y)
+            else:
+                signal_X.append(np.full(input_shape, np.nan))
+
+    signal_X = np.array(signal_X)
+    signal_Y = rets[size:]
+    return (np.array(X), np.array(Y)), (signal_X, signal_Y)
 
 
 # ele data structure:
@@ -177,7 +189,7 @@ def ele_normalize(ele, full):
 
 
 def main(size, Y_select, bar):
-    tickers, dates, dataset, train_split, test_split = extract_2_X()
+    tickers, dates, dataset, train_split, test_split = extract_2_X(size, Y_select, bar)
     end_dateset = dataset[0].shape[1]
     print('Extract Finish!')
     train_data = X_cut(dataset, 0, train_split, size, Y_select, bar)

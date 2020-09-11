@@ -1,7 +1,6 @@
 import Data_Process, Model
 import tensorflow as tf
 import pickle, sys, os
-from multiprocessing import Process
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -64,6 +63,76 @@ def get_perform(model, test_data):
     return loss, IC
 
 
+def divide_bins_average(y_true_slice, ranks):
+    num_each_bins = len(ranks) // 10
+    res = []
+    for i in range(10):
+        if i < 9:
+            stocks = ranks[i*num_each_bins: (i+1)*num_each_bins]
+        else:
+            stocks = ranks[i*num_each_bins:]
+        select = y_true_slice[stocks]
+        bin_aver = np.nanmean(select)
+        res.append(bin_aver)
+    return np.array(res)
+
+
+def get_perform_period(y_pred, y_true):
+    res, IC, pred_cum, true_cum = [], [], np.array([]), np.array([])
+    for i in range(y_pred.shape[0]):
+        y_pred_slice, y_true_slice = y_pred[i], y_true[i]
+        valid_stocks = np.where((~np.isnan(y_pred_slice)) & (~np.isnan(y_true_slice)))[0]
+        y_pred_slice, y_true_slice = y_pred_slice[valid_stocks], y_true_slice[valid_stocks]
+
+        pred_cum = np.concatenate([pred_cum, y_pred_slice], axis=0)
+        true_cum = np.concatenate([true_cum, y_true_slice], axis=0)
+
+        IC.append(np.corrcoef(y_pred_slice, y_true_slice)[0,1])
+        pred_rank = np.argsort(y_pred_slice)
+        bins_average = divide_bins_average(y_true_slice, pred_rank)
+        res.append(bins_average)
+    res = np.array(res).T
+    res = res + 1
+    res = np.cumprod(res, axis=1)
+    return res, np.nanmean(np.array(IC)), np.corrcoef(pred_cum, true_cum)[0,1]
+
+
+def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode):
+    def get_signal_perform(model, data_signal):
+        signal_X, y_true = data_signal
+        y_pred = model.predict(data_signal).reshape(y_true.shape)
+        res, IC, w_IC = get_perform_period(y_pred, y_true)
+        return res, IC, w_IC
+
+    train_res, train_IC, train_w_IC = get_signal_perform(model, train_data_signal)
+    valid_res, valid_IC, valid_w_IC = get_signal_perform(model, valid_data_signal)
+    test_res, test_IC, test_w_IC = get_signal_perform(model, test_data_signal)
+
+    fig = plt.figure(figsize=(18,8))
+    ax1 = fig.add_subplot(131)
+    for i in range(len(train_res)):
+        record = train_res[i]
+        ax1.plot(record, label='group '+str(i))
+    ax1.set_title('Train IC=%4f, All IC=%4f' % (train_IC, train_w_IC))
+    ax1.legend()
+
+    ax2 = fig.add_subplot(132)
+    for i in range(len(valid_res)):
+        record = valid_res[i]
+        ax2.plot(record, label='group '+str(i))
+    ax2.set_title('Valid IC=%4f, All IC=%4f' % (valid_IC, valid_w_IC))
+    ax2.legend()
+
+    ax3 = fig.add_subplot(133)
+    for i in range(len(test_res)):
+        record = test_res[i]
+        ax3.plot(record, label='group '+str(i))
+    ax3.set_title('Test IC=%4f, All IC=%4f' % (test_IC, test_w_IC))
+    ax3.legend()
+
+    fig.savefig(log_path + mode + '_pnl.jpeg')
+
+
 def main(inputs):
     # For select model and activation function
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x', 'y':'y'}
@@ -77,6 +146,10 @@ def main(inputs):
 
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
         = Data_Process.main(int(size), int(select), int(start_bar))
+
+    train_data, train_data_signal = train_data
+    valid_data, valid_data_signal = valid_data
+    test_data, test_data_signal = test_data
 
     print('Train dates:', train_date[0], train_date[-1])
     print('Valid dates:', valid_date[0], valid_date[-1])
@@ -92,7 +165,7 @@ def main(inputs):
     batch_size = 10000
     train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
     valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
-    test_data_tf = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
+    test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
     for mod in modes:
         for act in activations:
@@ -136,15 +209,16 @@ def main(inputs):
             model.summary()
 
             history = model.fit(train_data, valid_data, epochs=50, filepath=log_path)
-            test_loss, test_metrics = model.evaluate(test_data_tf)
+            test_loss, test_metrics = model.evaluate(test_data)
             print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
             plot_history(history, test_loss, test_metrics, mode, log_path)
             with open(log_path + mode + '_history.pkl', 'wb') as file:
                 pickle.dump((history.history, test_loss, test_metrics), file)
 
+            get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
+
 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[6]
     main(sys.argv[1:-1])
-

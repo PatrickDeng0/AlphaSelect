@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 def get_res(model, size, Y_select, bar):
-    tickers, dates, dataset, train_split, test_split = Data_Process.extract_2_X()
+    tickers, dates, dataset, train_split, test_split = Data_Process.extract_2_X(size, Y_select, bar)
     daily, features, stock_rets, market_rets = dataset[0], dataset[1], \
                                                dataset[2][Y_select,:,:,bar], dataset[3][Y_select,:,bar]
     st_state, trade_state = daily[0], daily[1]
@@ -52,11 +52,14 @@ def divide_bins_average(y_true_slice, ranks):
 
 
 def get_perform_period(y_pred_cut, y_true, indexs):
-    res, IC = [], []
+    res, IC, pred_cum, true_cum = [], [], np.array([]), np.array([])
     for index in indexs:
         y_pred_slice, y_true_slice = y_pred_cut[index], y_true[index]
         valid_stocks = np.where((~np.isnan(y_pred_slice)) & (~np.isnan(y_true_slice)))[0]
         y_pred_slice, y_true_slice = y_pred_slice[valid_stocks], y_true_slice[valid_stocks]
+
+        pred_cum = np.concatenate([pred_cum, y_pred_slice], axis=0)
+        true_cum = np.concatenate([true_cum, y_true_slice], axis=0)
 
         IC.append(np.corrcoef(y_pred_slice, y_true_slice)[0,1])
         pred_rank = np.argsort(y_pred_slice)
@@ -65,37 +68,37 @@ def get_perform_period(y_pred_cut, y_true, indexs):
     res = np.array(res).T
     res = res + 1
     res = np.cumprod(res, axis=1)
-    return res, np.nanmean(np.array(IC))
+    return res, np.nanmean(np.array(IC)), np.corrcoef(pred_cum, true_cum)[0,1]
 
 
 def get_perform(y_pred, y_true, dates, train_split, test_split, model_prefix):
     index_train = np.where(dates < dates[train_split])[0]
     index_valid = np.where((dates < dates[test_split]) & (dates >= dates[train_split]))[0]
     index_test = np.where(dates >= dates[test_split])[0]
-    train_res, train_IC = get_perform_period(y_pred, y_true, index_train)
-    valid_res, valid_IC = get_perform_period(y_pred, y_true, index_valid)
-    test_res, test_IC = get_perform_period(y_pred, y_true, index_test)
+    train_res, train_IC, train_w_IC = get_perform_period(y_pred, y_true, index_train)
+    valid_res, valid_IC, valid_w_IC = get_perform_period(y_pred, y_true, index_valid)
+    test_res, test_IC, test_w_IC = get_perform_period(y_pred, y_true, index_test)
 
     fig = plt.figure(figsize=(18,8))
     ax1 = fig.add_subplot(131)
     for i in range(len(train_res)):
         record = train_res[i]
         ax1.plot(record, label='group '+str(i))
-    ax1.set_title('Train IC=%4f' % train_IC)
+    ax1.set_title('Train IC=%4f, All IC=%4f' % (train_IC, train_w_IC))
     ax1.legend()
 
     ax2 = fig.add_subplot(132)
     for i in range(len(valid_res)):
         record = valid_res[i]
         ax2.plot(record, label='group '+str(i))
-    ax2.set_title('Valid IC=%4f' % valid_IC)
+    ax2.set_title('Valid IC=%4f, All IC=%4f' % (valid_IC, valid_w_IC))
     ax2.legend()
 
     ax3 = fig.add_subplot(133)
     for i in range(len(test_res)):
         record = test_res[i]
         ax3.plot(record, label='group '+str(i))
-    ax3.set_title('Test IC=%4f' % test_IC)
+    ax3.set_title('Test IC=%4f, All IC=%4f' % (test_IC, test_w_IC))
     ax3.legend()
 
     fig.savefig('models/' + model_prefix + '_pnl.jpeg')

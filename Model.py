@@ -79,18 +79,15 @@ class CNN_Pred(Model):
         self._conv_layer = self._get_conv_layer()
 
     def _get_conv_layer(self):
-        # time_shape, ks, ps, strides = self._input_shape[0], self._kernel_size[0]-1, self._pool_size[0], self._strides[0]
-        # res = 0
-        # while True:
-        #     time_shape = time_shape // strides
-        #     print(time_shape)
-        #     time_shape = time_shape // ps
-        #     print(time_shape)
-        #     res += 1
-        #     if time_shape < 8:
-        #         break
-        # return res
-        return 2
+        if self._input_shape[0] % 16 == 0:
+            days = self._input_shape[0] // 16
+        else:
+            days = self._input_shape[0] // 16 + 1
+        res = 0
+        while days > 4:
+            days = days // 2 + 1
+            res += 1
+        return res
 
     def _build_model(self):
         inputs = tk.layers.Input(shape=self._input_shape)
@@ -98,12 +95,16 @@ class CNN_Pred(Model):
         x = tk.layers.Reshape(re_shape, input_shape=self._input_shape)(inputs)
         x = tk.layers.Conv2D(self._num_vr_kernel, (1, self._input_shape[1]), activation='relu')(x)
 
-        for _ in range(self._conv_layer):
+        for _ in range(2):
             x = tk.layers.Conv2D(self._num_time_kernel, self._kernel_size, strides=self._strides,
-                                 activation='relu')(x)
-            max_pool = tk.layers.MaxPool2D(self._pool_size)(x)
-            aver_pool = tk.layers.AvgPool2D(self._pool_size)(x)
+                                 activation='relu', padding='same')(x)
+            max_pool = tk.layers.MaxPool2D(self._pool_size, padding='same')(x)
+            aver_pool = tk.layers.AvgPool2D(self._pool_size, padding='same')(x)
             x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
+
+        for _ in range(self._conv_layer):
+            x = tk.layers.Conv2D(self._num_time_kernel*2, self._kernel_size, strides=self._strides,
+                                 activation='relu', padding='same')(x)
 
         x = tk.layers.Flatten()(x)
         x = tk.layers.Dense(self._num_dense, activation=self._activation)(x)
