@@ -138,14 +138,14 @@ def main(inputs):
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x', 'y':'y'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
-    size, select, start_bar, activations, modes = inputs
+    size, select, start_bar, market, activations, modes = inputs
     float_init_lr = 10 ** (-3)
 
     log_path = 'logs/'
     os.makedirs(log_path, exist_ok=True)
 
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
-        = Data_Process.main(int(size), int(select), int(start_bar))
+        = Data_Process.main(int(size), int(select), int(start_bar), market)
 
     train_data, train_data_signal = train_data
     valid_data, valid_data_signal = valid_data
@@ -176,7 +176,7 @@ def main(inputs):
             print('=============================================================================')
             print('Model: %s, Activation: %s' % (mode, activation))
 
-            log_path = 'logs/' + '_'.join([size, select, start_bar]) + '/' + act + '/'
+            log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/' + act + '/'
             os.makedirs(log_path, exist_ok=True)
 
             if mode == 'cnn':
@@ -220,5 +220,5 @@ def main(inputs):
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[6]
+    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
     main(sys.argv[1:-1])

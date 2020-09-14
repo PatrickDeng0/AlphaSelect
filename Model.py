@@ -102,11 +102,13 @@ class CNN_Pred(Model):
             aver_pool = tk.layers.AvgPool2D(self._pool_size, padding='same')(x)
             x = tk.layers.Concatenate(axis=3)([max_pool, aver_pool])
 
+        x = tk.layers.Dropout(rate=0.5)(x)
         for _ in range(self._conv_layer):
             x = tk.layers.Conv2D(self._num_time_kernel*2, self._kernel_size, strides=self._strides,
                                  activation='relu', padding='same')(x)
 
         x = tk.layers.Flatten()(x)
+        x = tk.layers.Dropout(rate=0.5)(x)
         x = tk.layers.Dense(self._num_dense, activation=self._activation)(x)
         output = tk.layers.Dense(1)(x)
         model = tk.Model(inputs=inputs, outputs=output)
