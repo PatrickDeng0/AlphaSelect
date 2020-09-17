@@ -127,9 +127,6 @@ def extract_2_X(size, Y_select, bar, market):
     trade_state = bar_trade_limit[:, :, bar]
 
     # Split dataset according to dates
-    num_date = close_ret.shape[0]
-    train_split = np.int(num_date * 0.8)
-    test_split = np.int(num_date * 0.9)
     dataset = [np.array([st_state[:-1], trade_state[:-1]]),
                np.array([ask_order_volume_total[:-1], bid_order_volume_total[:-1], volume[:-1],
                          adj_close[:-1], adj_pre_close[:-1], adj_vwap[:-1],
@@ -138,6 +135,8 @@ def extract_2_X(size, Y_select, bar, market):
                np.array([market_ret, market_ret_intra[:-1]])
                ]
     dates = dates[:-1]
+    train_split = np.sum(dates <= 20180000)
+    test_split = np.sum(dates <= 20180699)
     return tickers, dates, dataset, train_split, test_split
 
 
@@ -238,4 +237,4 @@ def main(size, Y_select, bar, market):
 
 
 if __name__ == '__main__':
-    main(2, 0, 15, 'm')
+    main(2, 0, 15, 'e')

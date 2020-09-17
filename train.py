@@ -4,6 +4,7 @@ import pickle, sys, os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime as dt
 
 
 def plot_history(history, test_loss, test_metrics, mode, log_path):
@@ -138,85 +139,87 @@ def main(inputs):
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x', 'y':'y'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
 
-    size, select, start_bar, market, activations, modes = inputs
+    size, select, start_bar, markets, activations, modes = inputs
     float_init_lr = 10 ** (-3)
-
-    log_path = 'logs/'
-    os.makedirs(log_path, exist_ok=True)
-
-    tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
-        = Data_Process.main(int(size), int(select), int(start_bar), market)
-
-    train_data, train_data_signal = train_data
-    valid_data, valid_data_signal = valid_data
-    test_data, test_data_signal = test_data
-
-    print('Train dates:', train_date[0], train_date[-1])
-    print('Valid dates:', valid_date[0], valid_date[-1])
-    print('Test dates:', test_date[0], test_date[-1])
-    print('=============================================================================')
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
     for gpu in gpus:
         tf.config.experimental.set_memory_growth(gpu, True)
     print('GPU working', tf.test.is_gpu_available())
 
-    input_shape = train_data[0].shape[1:]
-    batch_size = 10000
-    train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
-    valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
-    test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
+    log_path = 'logs/'
+    os.makedirs(log_path, exist_ok=True)
 
-    for mod in modes:
-        for act in activations:
-            mode = mod_dict[mod]
-            activation = act_dict[act]
+    for market in markets:
+        tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
+            = Data_Process.main(int(size), int(select), int(start_bar), market)
 
-            print('=============================================================================')
-            print('=============================================================================')
-            print('Model: %s, Activation: %s' % (mode, activation))
+        train_data, train_data_signal = train_data
+        valid_data, valid_data_signal = valid_data
+        test_data, test_data_signal = test_data
 
-            log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/' + act + '/'
-            os.makedirs(log_path, exist_ok=True)
+        print('Train dates:', train_date[0], train_date[-1])
+        print('Valid dates:', valid_date[0], valid_date[-1])
+        print('Test dates:', test_date[0], test_date[-1])
+        print('=============================================================================')
 
-            if mode == 'cnn':
-                model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                       num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                       kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                       activation=activation)
+        input_shape = train_data[0].shape[1:]
+        batch_size = 10000
+        train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
+        valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
+        test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
-            elif mode == 'tcn':
-                model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                        num_dense=16, activation=activation)
+        for mod in modes:
+            for act in activations:
+                mode = mod_dict[mod]
+                activation = act_dict[act]
 
-            elif mode == 'x':
-                model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                      num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                      kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                      activation=activation)
+                print('=============================================================================')
+                print('=============================================================================')
+                print('Model: %s, Activation: %s' % (mode, activation))
+                print(dt.datetime.now())
 
-            elif mode == 'y':
-                model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                      num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                      kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                      activation=activation)
+                log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/' + act + '/'
+                os.makedirs(log_path, exist_ok=True)
 
-            else:
-                model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                         num_dense=16, activation=activation)
+                if mode == 'cnn':
+                    model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                           num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                           kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                           activation=activation)
 
-            model.load(log_path + mode + '_model.h5')
-            model.summary()
+                elif mode == 'tcn':
+                    model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                            num_dense=16, activation=activation)
 
-            history = model.fit(train_data, valid_data, epochs=50, filepath=log_path)
-            test_loss, test_metrics = model.evaluate(test_data)
-            print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+                elif mode == 'x':
+                    model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                          num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                          kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                          activation=activation)
 
-            plot_history(history, test_loss, test_metrics, mode, log_path)
-            with open(log_path + mode + '_history.pkl', 'wb') as file:
-                pickle.dump((history.history, test_loss, test_metrics), file)
+                elif mode == 'y':
+                    model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                          num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                          kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                          activation=activation)
 
-            get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
+                else:
+                    model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                             num_dense=16, activation=activation)
+
+                model._build_model()
+                model.summary()
+
+                history = model.fit(train_data, valid_data, epochs=50, filepath=log_path)
+                test_loss, test_metrics = model.evaluate(test_data)
+                print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+
+                plot_history(history, test_loss, test_metrics, mode, log_path)
+                with open(log_path + mode + '_history.pkl', 'wb') as file:
+                    pickle.dump((history.history, test_loss, test_metrics), file)
+
+                get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
 
 
 if __name__ == '__main__':
