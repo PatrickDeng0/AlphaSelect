@@ -211,7 +211,8 @@ def main(inputs):
                 model._build_model()
                 model.summary()
 
-                history = model.fit(train_data, valid_data, epochs=50, filepath=log_path)
+                history = model.fit(train_data, valid_data, epochs=50)
+                model.save_model(filepath=log_path)
                 test_loss, test_metrics = model.evaluate(test_data)
                 print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
