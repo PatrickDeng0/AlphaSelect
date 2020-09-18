@@ -78,7 +78,7 @@ def get_data(size, Y_select, bar, market):
                np.array([close_ret, close_ret_intra[:-1]]),
                np.array([market_ret, market_ret_intra[:-1]])
                ]
-    dates = dates[:-1]
+    dates = dates[size:-1]
     return tickers, dates, dataset
 
 
