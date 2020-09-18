@@ -82,7 +82,7 @@ def get_data(size, Y_select, bar, market):
     return tickers, dates, dataset
 
 
-def get_res(model, dataset, size, bar):
+def get_res(model, dataset, size, Y_select, bar):
     daily, features, stock_rets, market_rets = dataset[0], dataset[1], \
                                                dataset[2][Y_select,:,:,bar], dataset[3][Y_select,:,bar]
     rets = stock_rets - market_rets[:, np.newaxis]
@@ -190,7 +190,7 @@ def main(size, Y_select, bar, mode):
                                  num_dense=16, activation='relu')
 
     model.load_model('models/' + model_prefix + '_model.h5')
-    y_pred, y_true = get_res(model, size, Y_select, bar)
+    y_pred, y_true = get_res(model, dataset, size, Y_select, bar)
 
     get_perform(y_pred, y_true, model_prefix)
 
