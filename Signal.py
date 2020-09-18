@@ -6,35 +6,110 @@ import datetime as dt
 import matplotlib.pyplot as plt
 
 
-def get_res(model, size, Y_select, bar):
-    tickers, dates, dataset, train_split, test_split = Data_Process.extract_2_X(size, Y_select, bar)
+def get_data(size, Y_select, bar, market):
+    d_res = Data_Process.mat_reader('data/Raw.mat')
+    ticks_res = Data_Process.ticks_reader('data/w_data_ticks_15min.h5')
+    trans_res = Data_Process.trans_reader('data/w_data_trans_15min.h5')
+
+    # Find the dates of total dataset
+    min_dates = 20160108
+    max_dates = 20191231
+    Data_Process.time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
+
+    print('d_res shape:', d_res[-1].shape)
+    print('ticks_res shape:', ticks_res[-1].shape)
+    print('trans_res shape:', trans_res[-1].shape)
+
+    # Unzip
+    _, dates, st_state, AdjustClse, clse, pclse, val, shr, TotalShares = d_res
+    tickers, _, ask_order_volume_total, bid_order_volume_total, volume, close, pre_close, vwap = ticks_res
+    _, _, amount_ask, amount_bid = trans_res
+
+    amount_ask[np.isnan(amount_ask)] = 1
+    amount_bid[np.isnan(amount_bid)] = 1
+
+    # Judge whether there is mistake data at first!
+    daily_ret = clse / pclse - 1
+    daily_ret_mistake = np.where(np.abs(daily_ret) > 0.11)
+    clse[daily_ret_mistake] = np.nan
+    pclse[daily_ret_mistake] = np.nan
+    AdjustClse[daily_ret_mistake] = np.nan
+
+    close[np.where(np.abs(close / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
+    pre_close[np.where(np.abs(pre_close / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
+    vwap[np.where(np.abs(vwap / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
+
+    # Judge whether that bar is trade limit (If so, exclude from market return)
+    bar_trade_limit = (np.abs(close / pre_close[:,:,0][:,:,np.newaxis] - 1) < 0.095)
+
+    # calculate the adjuested price, market value
+    adjust_coef = AdjustClse / clse
+    adj_close = close * adjust_coef[:, :, np.newaxis]
+    adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
+    adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
+
+    # Get daily and intraday stock return
+    close_ret = (close[1:] / pre_close[1:,:,0][:,:,np.newaxis]) * \
+                (close[:-1,:,-1][:,:,np.newaxis] / close[:-1]) - 1
+    close_ret_intra = close[:, :, -1][:, :, np.newaxis] / close - 1
+
+    # Get close daily and intraday market return (interday and intraday)
+    # Get market return through market value weighted mean
+    if market == 'm':
+        stock_value = TotalShares * pclse
+        market_value = np.nansum(stock_value, axis=1)
+        stock_weights = stock_value / market_value[:, np.newaxis]
+        market_ret = np.nansum(close_ret * bar_trade_limit[:-1] * stock_weights[1:, :, np.newaxis], axis=1)
+        market_ret_intra = np.nansum(close_ret_intra * bar_trade_limit * stock_weights[:, :, np.newaxis], axis=1)
+
+    # Get market return through simple mean
+    else:
+        market_ret = np.nanmean(close_ret * bar_trade_limit[:-1], axis=1)
+        market_ret_intra = np.nanmean(close_ret_intra * bar_trade_limit, axis=1)
+
+    # Get whether is able to trade
+    trade_state = bar_trade_limit[:, :, bar]
+
+    # Split dataset according to dates
+    dataset = [np.array([st_state[:-1], trade_state[:-1]]),
+               np.array([ask_order_volume_total[:-1], bid_order_volume_total[:-1], volume[:-1],
+                         adj_close[:-1], adj_pre_close[:-1], adj_vwap[:-1],
+                         amount_ask[:-1], amount_bid[:-1]]),
+               np.array([close_ret, close_ret_intra[:-1]]),
+               np.array([market_ret, market_ret_intra[:-1]])
+               ]
+    dates = dates[:-1]
+    return tickers, dates, dataset
+
+
+def get_res(model, dataset, size, bar):
     daily, features, stock_rets, market_rets = dataset[0], dataset[1], \
                                                dataset[2][Y_select,:,:,bar], dataset[3][Y_select,:,bar]
+    rets = stock_rets - market_rets[:, np.newaxis]
     st_state, trade_state = daily[0], daily[1]
-    num_dates = dates.shape[0]
-    num_tickers = tickers.shape[0]
-
-    data = []
-    input_shape = (size*16+bar+1, 8)
-    for date in range(num_dates-size):
-        for t in range(num_tickers):
+    input_shape = (16*size+bar+1, 8)
+    nd, nt = st_state.shape
+    signal_X = []
+    for date in range(nd-size):
+        for t in range(nt):
             st_series = st_state[date:(date+size+1), t]
             daily_part_ele_data = features[:, date:(date+size), t, :].reshape((8, -1))
             intra_part_ele_data = features[:, date+size, t, :(bar+1)].reshape((8, -1))
             ele_data = np.concatenate([daily_part_ele_data, intra_part_ele_data], axis=1)
-            if np.sum(st_series) == 0 and trade_state[date+size-1, t] and not np.isnan(np.sum(ele_data)):
-                ele_data = Data_Process.ele_normalize(ele_data, full=False)
-            else:
-                ele_data = np.full(input_shape, np.nan)
-            data.append(ele_data)
+            date_rets = rets[date+size, t]
 
-    data = np.array(data)
-    y_pred = model.predict(data).reshape((num_dates-size, num_tickers))
-    print(y_pred.shape)
-    y_true = stock_rets[size:] - market_rets[size:, np.newaxis]
-    print(y_true.shape)
-    dates = dates[size:]
-    return y_pred, y_true, dates, tickers, train_split, test_split
+            # Not ST, and not trading halt!
+            if np.sum(st_series) == 0 and trade_state[date+size, t] and \
+                    not np.isnan(np.sum(ele_data)) and not np.isnan(date_rets):
+                ele_data = Data_Process.ele_normalize(ele_data, full=False)
+                signal_X.append(ele_data)
+            else:
+                signal_X.append(np.full(input_shape, np.nan))
+
+    y_true = rets[size:]
+    signal_X = np.array(signal_X)
+    y_pred = model.predict(signal_X).reshape(y_true.shape)
+    return y_true, y_pred
 
 
 def divide_bins_average(y_true_slice, ranks):
@@ -51,10 +126,10 @@ def divide_bins_average(y_true_slice, ranks):
     return np.array(res)
 
 
-def get_perform_period(y_pred_cut, y_true, indexs):
+def get_perform_period(y_pred, y_true):
     res, IC, pred_cum, true_cum = [], [], np.array([]), np.array([])
-    for index in indexs:
-        y_pred_slice, y_true_slice = y_pred_cut[index], y_true[index]
+    for i in range(y_pred.shape[0]):
+        y_pred_slice, y_true_slice = y_pred[i], y_true[i]
         valid_stocks = np.where((~np.isnan(y_pred_slice)) & (~np.isnan(y_true_slice)))[0]
         y_pred_slice, y_true_slice = y_pred_slice[valid_stocks], y_true_slice[valid_stocks]
 
@@ -71,52 +146,53 @@ def get_perform_period(y_pred_cut, y_true, indexs):
     return res, np.nanmean(np.array(IC)), np.corrcoef(pred_cum, true_cum)[0,1]
 
 
-def get_perform(y_pred, y_true, dates, train_split, test_split, model_prefix):
-    index_train = np.where(dates < dates[train_split])[0]
-    index_valid = np.where((dates < dates[test_split]) & (dates >= dates[train_split]))[0]
-    index_test = np.where(dates >= dates[test_split])[0]
-    train_res, train_IC, train_w_IC = get_perform_period(y_pred, y_true, index_train)
-    valid_res, valid_IC, valid_w_IC = get_perform_period(y_pred, y_true, index_valid)
-    test_res, test_IC, test_w_IC = get_perform_period(y_pred, y_true, index_test)
-
+def get_perform(y_pred, y_true, model_prefix):
+    res, IC, w_IC = get_perform_period(y_pred, y_true)
     fig = plt.figure(figsize=(18,8))
-    ax1 = fig.add_subplot(131)
-    for i in range(len(train_res)):
-        record = train_res[i]
-        ax1.plot(record, label='group '+str(i))
-    ax1.set_title('Train IC=%4f, All IC=%4f' % (train_IC, train_w_IC))
-    ax1.legend()
-
-    ax2 = fig.add_subplot(132)
-    for i in range(len(valid_res)):
-        record = valid_res[i]
-        ax2.plot(record, label='group '+str(i))
-    ax2.set_title('Valid IC=%4f, All IC=%4f' % (valid_IC, valid_w_IC))
-    ax2.legend()
-
-    ax3 = fig.add_subplot(133)
-    for i in range(len(test_res)):
-        record = test_res[i]
+    ax3 = fig.add_subplot(131)
+    for i in range(len(res)):
+        record = res[i]
         ax3.plot(record, label='group '+str(i))
-    ax3.set_title('Test IC=%4f, All IC=%4f' % (test_IC, test_w_IC))
+    ax3.set_title('IC=%4f, All IC=%4f' % (IC, w_IC))
     ax3.legend()
-
     fig.savefig('models/' + model_prefix + '_pnl.jpeg')
 
 
-def main(size, Y_select, bar):
+def main(size, Y_select, bar, mode):
     input_shape = (size*16+bar+1, 8)
-    mode, float_init_lr, activation = 'x', 0.0001, 'relu'
+    tickers, dates, dataset = get_data(size, Y_select, bar, 'e')
 
     model_prefix = mode + '_' + str(size) + '_' + str(Y_select) + '_' + str(bar)
-    model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                          num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                          kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
-                          activation=activation)
-    model.load('models/' + model_prefix + '_model.h5')
-    y_pred, y_true, dates, tickers, train_split, test_split = get_res(model, size, Y_select, bar)
+    if mode == 'cnn':
+        model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=0.001,
+                               num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                               kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                               activation='relu')
 
-    get_perform(y_pred, y_true, dates, train_split, test_split, model_prefix)
+    elif mode == 'tcn':
+        model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=0.001,
+                                num_dense=16, activation='relu')
+
+    elif mode == 'x':
+        model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=0.001,
+                              num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                              kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                              activation='relu')
+
+    elif mode == 'y':
+        model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=0.001,
+                              num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                              kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                              activation='relu')
+
+    else:
+        model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=0.001,
+                                 num_dense=16, activation='relu')
+
+    model.load_model('models/' + model_prefix + '_model.h5')
+    y_pred, y_true = get_res(model, size, Y_select, bar)
+
+    get_perform(y_pred, y_true, model_prefix)
 
     tickers_t = []
     for ticker in tickers:
@@ -130,7 +206,7 @@ def main(size, Y_select, bar):
 
 
 if __name__ == '__main__':
-    size, Y_select, bar = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
-    main(size, Y_select, bar)
+    size, Y_select, bar, mode = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+    main(size, Y_select, bar, mode)
 
 # nohup python3 Signal.py 1 0 15 > models/1_0_15.log 2>&1 &

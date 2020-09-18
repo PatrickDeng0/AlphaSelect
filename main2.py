@@ -24,3 +24,7 @@ os.system(cmd_line)
 # nohup python3 main2.py 3 1 2 e r c r 0 > /dev/null 2>&1 &
 # nohup python3 main2.py 3 1 2 e r c n 0 > /dev/null 2>&1 &
 # nohup python3 main2.py 3 1 2 e r c a 0 > /dev/null 2>&1 &
+
+# nohup python3 main2.py 5 0 15 e r c r 0 > /dev/null 2>&1 &
+# nohup python3 main2.py 5 0 15 e r c n 0 > /dev/null 2>&1 &
+# nohup python3 main2.py 5 0 15 e r c a 0 > /dev/null 2>&1 &

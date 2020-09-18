@@ -1,6 +1,6 @@
 import Data_Process, Model
 import tensorflow as tf
-import pickle, sys, os
+import pickle, sys, os, h5py
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -103,11 +103,11 @@ def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, lo
         signal_X, y_true = data_signal
         y_pred = model.predict(data_signal).reshape(y_true.shape)
         res, IC, w_IC = get_perform_period(y_pred, y_true)
-        return res, IC, w_IC
+        return res, IC, w_IC, y_pred, y_true
 
-    train_res, train_IC, train_w_IC = get_signal_perform(model, train_data_signal)
-    valid_res, valid_IC, valid_w_IC = get_signal_perform(model, valid_data_signal)
-    test_res, test_IC, test_w_IC = get_signal_perform(model, test_data_signal)
+    train_res, train_IC, train_w_IC, train_pred, train_return = get_signal_perform(model, train_data_signal)
+    valid_res, valid_IC, valid_w_IC, valid_pred, valid_return = get_signal_perform(model, valid_data_signal)
+    test_res, test_IC, test_w_IC, test_pred, test_return = get_signal_perform(model, test_data_signal)
 
     fig = plt.figure(figsize=(18,8))
     ax1 = fig.add_subplot(131)
@@ -132,14 +132,16 @@ def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, lo
     ax3.legend()
 
     fig.savefig(log_path + mode + '_pnl.jpeg')
+    return train_pred, train_return, valid_pred, valid_return, test_pred, test_return
 
 
 def main(inputs):
     # For select model and activation function
     mod_dict = {'c':'cnn', 'l':'lstm', 'b':'bilstm', 't':'tcn', 'x':'x', 'y':'y'}
     act_dict = {'s': 'sigmoid', 't': 'tanh', 'r': 'relu'}
+    opt_dict = {'r': 'RMSprop', 'n': 'Nadam', 'a': 'Adam'}
 
-    size, select, start_bar, markets, activations, modes = inputs
+    size, select, start_bar, markets, activations, modes, optimizers = inputs
     float_init_lr = 10 ** (-3)
 
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -148,11 +150,17 @@ def main(inputs):
     print('GPU working', tf.test.is_gpu_available())
 
     log_path = 'logs/'
+    signal_path = 'signals/'
     os.makedirs(log_path, exist_ok=True)
+    os.makedirs(signal_path, exist_ok=True)
 
     for market in markets:
         tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
             = Data_Process.main(int(size), int(select), int(start_bar), market)
+
+        tickers_t = []
+        for ticker in tickers:
+            tickers_t.append(ticker.encode())
 
         train_data, train_data_signal = train_data
         valid_data, valid_data_signal = valid_data
@@ -171,58 +179,80 @@ def main(inputs):
 
         for mod in modes:
             for act in activations:
-                mode = mod_dict[mod]
-                activation = act_dict[act]
+                for opt in optimizers:
+                    mode = mod_dict[mod]
+                    activation = act_dict[act]
+                    optimizer = opt_dict[opt]
 
-                print('=============================================================================')
-                print('=============================================================================')
-                print('Model: %s, Activation: %s' % (mode, activation))
-                print(dt.datetime.now())
+                    print('=============================================================================')
+                    print('=============================================================================')
+                    print('Model: %s, Activation: %s, Optimizer: %s' % (mode, activation, optimizer))
+                    print(dt.datetime.now())
 
-                log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/' + act + '/'
-                os.makedirs(log_path, exist_ok=True)
+                    log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/'\
+                               + activation + '_' + optimizer + '/'
+                    signal_path = 'signals/' + '_'.join([size, select, start_bar, market]) + '/' \
+                                  + activation + '_' + optimizer + '/'
+                    os.makedirs(log_path, exist_ok=True)
+                    os.makedirs(signal_path, exist_ok=True)
 
-                if mode == 'cnn':
-                    model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                           num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                           kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                           activation=activation)
+                    if mode == 'cnn':
+                        model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                               num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                               kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                               activation=activation, optimizer=optimizer)
 
-                elif mode == 'tcn':
-                    model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                            num_dense=16, activation=activation)
+                    elif mode == 'tcn':
+                        model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                                num_dense=16, activation=activation, optimizer=optimizer)
 
-                elif mode == 'x':
-                    model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                          num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                          kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                          activation=activation)
+                    elif mode == 'x':
+                        model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                              num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                              kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                              activation=activation, optimizer=optimizer)
 
-                elif mode == 'y':
-                    model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                          num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                          kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                          activation=activation)
+                    elif mode == 'y':
+                        model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                              num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                                              kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
+                                              activation=activation, optimizer=optimizer)
 
-                else:
-                    model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                             num_dense=16, activation=activation)
+                    else:
+                        model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                                                 num_dense=16, activation=activation, optimizer=optimizer)
 
-                model._build_model()
-                model.summary()
+                    model._build_model()
+                    model.summary()
 
-                history = model.fit(train_data, valid_data, epochs=50)
-                model.save_model(filepath=log_path)
-                test_loss, test_metrics = model.evaluate(test_data)
-                print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+                    history = model.fit(train_data, valid_data, epochs=50)
+                    model.save_model(filepath=log_path)
+                    test_loss, test_metrics = model.evaluate(test_data)
+                    print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
-                plot_history(history, test_loss, test_metrics, mode, log_path)
-                with open(log_path + mode + '_history.pkl', 'wb') as file:
-                    pickle.dump((history.history, test_loss, test_metrics), file)
+                    plot_history(history, test_loss, test_metrics, mode, log_path)
+                    with open(log_path + mode + '_history.pkl', 'wb') as file:
+                        pickle.dump((history.history, test_loss, test_metrics), file)
 
-                get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
+                    train_pred, train_return, valid_pred, valid_return, test_pred, test_return = \
+                        get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
+
+                    with h5py.File(signal_path + mode + '_signal.h5', 'w') as h5f:
+                        h5f.create_dataset('train_signals', data=train_pred)
+                        h5f.create_dataset('train_dates', data=train_date)
+                        h5f.create_dataset('train_return', data=train_return)
+
+                        h5f.create_dataset('valid_signals', data=valid_pred)
+                        h5f.create_dataset('valid_dates', data=valid_date)
+                        h5f.create_dataset('valid_return', data=valid_return)
+
+                        h5f.create_dataset('test_signals', data=test_pred)
+                        h5f.create_dataset('test_dates', data=test_date)
+                        h5f.create_dataset('test_return', data=test_return)
+
+                        h5f.create_dataset('tickers', data=tickers_t)
 
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[7]
+    os.environ['CUDA_VISIBLE_DEVICES'] = sys.argv[8]
     main(sys.argv[1:-1])

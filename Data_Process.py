@@ -202,9 +202,9 @@ def main(size, Y_select, bar, market):
     valid_data = X_cut(dataset, train_split, test_split, size, Y_select, bar)
     test_data = X_cut(dataset, test_split, end_dateset, size, Y_select, bar)
 
-    train_date = dates[:train_split]
-    valid_date = dates[train_split:test_split]
-    test_date = dates[test_split:]
+    train_date = dates[size:train_split]
+    valid_date = dates[train_split+size:test_split]
+    test_date = dates[test_split+size:]
 
     # fig = plt.figure(figsize=(18,6))
     # ax1 = fig.add_subplot(131)
