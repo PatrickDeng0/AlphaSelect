@@ -109,7 +109,7 @@ def get_res(model, dataset, size, Y_select, bar):
     y_true = rets[size:]
     signal_X = np.array(signal_X)
     y_pred = model.predict(signal_X).reshape(y_true.shape)
-    return y_true, y_pred
+    return y_pred, y_true
 
 
 def divide_bins_average(y_true_slice, ranks):
@@ -148,8 +148,8 @@ def get_perform_period(y_pred, y_true):
 
 def get_perform(y_pred, y_true, model_prefix):
     res, IC, w_IC = get_perform_period(y_pred, y_true)
-    fig = plt.figure(figsize=(18,8))
-    ax3 = fig.add_subplot(131)
+    fig = plt.figure(figsize=(10,10))
+    ax3 = fig.add_subplot(111)
     for i in range(len(res)):
         record = res[i]
         ax3.plot(record, label='group '+str(i))
@@ -162,7 +162,7 @@ def main(size, Y_select, bar, mode):
     input_shape = (size*16+bar+1, 8)
     tickers, dates, dataset = get_data(size, Y_select, bar, 'e')
 
-    model_prefix = mode + '_' + str(size) + '_' + str(Y_select) + '_' + str(bar)
+    model_prefix = str(size) + '_' + str(Y_select) + '_' + str(bar) + '_' + mode
     if mode == 'cnn':
         model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=0.001,
                                num_vr_kernel=32, num_time_kernel=16, num_dense=16,
@@ -209,4 +209,7 @@ if __name__ == '__main__':
     size, Y_select, bar, mode = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
     main(size, Y_select, bar, mode)
 
-# nohup python3 Signal.py 1 0 15 > models/1_0_15.log 2>&1 &
+# nohup python3 Signal.py 4 0 15 x > models/4_0_15_x.log 2>&1 &
+# nohup python3 Signal.py 3 1 2 y > models/3_1_2_y.log 2>&1 &
+# nohup python3 Signal.py 5 0 15 cnn > models/5_0_15_cnn.log 2>&1 &
+# nohup python3 Signal.py 5 1 2 cnn > models/5_1_2_cnn.log 2>&1 &

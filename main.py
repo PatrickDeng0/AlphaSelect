@@ -13,6 +13,6 @@ python3 train.py %s %s %s %s %s %s %s %s > %s%s\
 print(cmd_line)
 os.system(cmd_line)
 
-# nohup python3 main.py 5 0 15 e rt xc ran 0 > /dev/null 2>&1 &
-# nohup python3 main.py 3 1 2 e rt yc ran 0 > /dev/null 2>&1 &
+# nohup python3 main.py 10 0 15 e rt cx rna 0 > /dev/null 2>&1 &
+# nohup python3 main.py 10 1 2 e rt cy rna 0 > /dev/null 2>&1 &
 # aipaas aistart -u dong -p qwer1234 --image=test --gpu=1 --pod_name=test4
