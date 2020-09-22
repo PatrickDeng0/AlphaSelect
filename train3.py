@@ -171,10 +171,12 @@ def main(inputs):
             test_data, test_data_signal = test_data
 
             print('=============================================================================')
+            print('=============================================================================')
             print('Begin training %d round' % num)
             print('Train dates:', train_date[0], train_date[-1])
             print('Valid dates:', valid_date[0], valid_date[-1])
             print('Test dates:', test_date[0], test_date[-1])
+            print('=============================================================================')
             print('=============================================================================')
 
             input_shape = train_data[0].shape[1:]
