@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import datetime as dt
 
 
-def plot_history(history, test_loss, test_metrics, mode, log_path):
+def plot_history(history, test_loss, test_metrics, mode, log_path, num):
     try:
         history_df = pd.DataFrame(history.history)
     except:
@@ -53,7 +53,7 @@ def plot_history(history, test_loss, test_metrics, mode, log_path):
     ax6.set_xlim(left=0, right=10)
     ax6.set_title('Performance')
 
-    fig1.savefig(log_path + mode + '_perform.jpeg')
+    fig1.savefig(log_path + mode + '_perform_%d.jpeg' % num)
 
 
 def get_perform(model, test_data):
@@ -98,7 +98,7 @@ def get_perform_period(y_pred, y_true):
     return res, np.nanmean(np.array(IC)), np.corrcoef(pred_cum, true_cum)[0,1]
 
 
-def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode):
+def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode, num):
     def get_signal_perform(model, data_signal):
         signal_X, y_true = data_signal
         y_pred = model.predict(data_signal).reshape(y_true.shape)
@@ -131,7 +131,7 @@ def get_signal(model, train_data_signal, valid_data_signal, test_data_signal, lo
     ax3.set_title('Test IC=%4f, All IC=%4f' % (test_IC, test_w_IC))
     ax3.legend()
 
-    fig.savefig(log_path + mode + '_pnl.jpeg')
+    fig.savefig(log_path + mode + '_pnl_%d.jpeg' % num)
     return train_pred, train_return, valid_pred, valid_return, test_pred, test_return
 
 
@@ -149,83 +149,89 @@ def main(inputs):
         tf.config.experimental.set_memory_growth(gpu, True)
     print('GPU working', tf.test.is_gpu_available())
 
-    log_path = 'logs/'
-    signal_path = 'signals/'
+    log_path = 'logs_3/'
+    signal_path = 'signals_3/'
     os.makedirs(log_path, exist_ok=True)
     os.makedirs(signal_path, exist_ok=True)
 
     for market in markets:
-        tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
-            = Data_Process.main(int(size), int(select), int(start_bar), market)
+        tickers, train_dates, valid_dates, test_dates, train_datas, valid_datas, test_datas \
+            = Data_Process.main2(int(size), int(select), int(start_bar), market)
 
         tickers_t = []
         for ticker in tickers:
             tickers_t.append(ticker.encode())
 
-        train_data, train_data_signal = train_data
-        valid_data, valid_data_signal = valid_data
-        test_data, test_data_signal = test_data
+        for num in range(3):
+            train_data, valid_data, test_data = train_datas[num], valid_datas[num], test_datas[num]
+            train_date, valid_date, test_date = train_dates[num], valid_dates[num], test_dates[num]
 
-        print('Train dates:', train_date[0], train_date[-1])
-        print('Valid dates:', valid_date[0], valid_date[-1])
-        print('Test dates:', test_date[0], test_date[-1])
-        print('=============================================================================')
+            train_data, train_data_signal = train_data
+            valid_data, valid_data_signal = valid_data
+            test_data, test_data_signal = test_data
 
-        input_shape = train_data[0].shape[1:]
-        batch_size = 10000
-        train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
-        valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
-        test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
+            print('=============================================================================')
+            print('Begin training %d round' % num)
+            print('Train dates:', train_date[0], train_date[-1])
+            print('Valid dates:', valid_date[0], valid_date[-1])
+            print('Test dates:', test_date[0], test_date[-1])
+            print('=============================================================================')
 
-        for mod in modes:
-            for act in activations:
-                for opt in optimizers:
-                    mode = mod_dict[mod]
-                    activation = act_dict[act]
-                    optimizer = opt_dict[opt]
+            input_shape = train_data[0].shape[1:]
+            batch_size = 10000
+            train_data = tf.data.Dataset.from_tensor_slices(train_data).shuffle(1000000).batch(batch_size)
+            valid_data = tf.data.Dataset.from_tensor_slices(valid_data).batch(batch_size)
+            test_data = tf.data.Dataset.from_tensor_slices(test_data).batch(batch_size)
 
-                    print('=============================================================================')
-                    print('=============================================================================')
-                    print('Model: %s, Activation: %s, Optimizer: %s' % (mode, activation, optimizer))
-                    print(dt.datetime.now())
+            for mod in modes:
+                for act in activations:
+                    for opt in optimizers:
+                        mode = mod_dict[mod]
+                        activation = act_dict[act]
+                        optimizer = opt_dict[opt]
 
-                    log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/'\
-                               + activation + '_' + optimizer + '/'
-                    signal_path = 'signals/' + '_'.join([size, select, start_bar, market]) + '/' \
-                                  + activation + '_' + optimizer + '/'
-                    os.makedirs(log_path, exist_ok=True)
-                    os.makedirs(signal_path, exist_ok=True)
+                        print('=============================================================================')
+                        print('=============================================================================')
+                        print('Model: %s, Activation: %s, Optimizer: %s' % (mode, activation, optimizer))
+                        print(dt.datetime.now())
 
-                    model = Model.model_select(mode, input_shape, float_init_lr, activation, optimizer)
-                    model._build_model()
-                    model.summary()
+                        log_path = 'logs_3/' + '_'.join([size, select, start_bar, market]) + '/'\
+                                   + activation + '_' + optimizer + '/'
+                        signal_path = 'signals_3/' + '_'.join([size, select, start_bar, market]) + '/' \
+                                      + activation + '_' + optimizer + '/'
+                        os.makedirs(log_path, exist_ok=True)
+                        os.makedirs(signal_path, exist_ok=True)
 
-                    history = model.fit(train_data, valid_data, epochs=50)
-                    model.save_model(filepath=log_path)
-                    test_loss, test_metrics = model.evaluate(test_data)
-                    print('Test Loss', test_loss, 'Test Metrics', test_metrics)
+                        model = Model.model_select(mode, input_shape, float_init_lr, activation, optimizer)
+                        model.load_model(log_path + mode + '_model.h5')
+                        model.summary()
 
-                    plot_history(history, test_loss, test_metrics, mode, log_path)
-                    with open(log_path + mode + '_history.pkl', 'wb') as file:
-                        pickle.dump((history.history, test_loss, test_metrics), file)
+                        history = model.fit(train_data, valid_data, epochs=50)
+                        model.save_model(filepath=log_path)
+                        test_loss, test_metrics = model.evaluate(test_data)
+                        print('Test Loss', test_loss, 'Test Metrics', test_metrics)
 
-                    train_pred, train_return, valid_pred, valid_return, test_pred, test_return = \
-                        get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode)
+                        plot_history(history, test_loss, test_metrics, mode, log_path, num)
+                        with open(log_path + mode + '_history_%d.pkl' % num, 'wb') as file:
+                            pickle.dump((history.history, test_loss, test_metrics), file)
 
-                    with h5py.File(signal_path + mode + '_signal.h5', 'w') as h5f:
-                        h5f.create_dataset('train_signals', data=train_pred)
-                        h5f.create_dataset('train_dates', data=train_date)
-                        h5f.create_dataset('train_return', data=train_return)
+                        train_pred, train_return, valid_pred, valid_return, test_pred, test_return = \
+                            get_signal(model, train_data_signal, valid_data_signal, test_data_signal, log_path, mode, num)
 
-                        h5f.create_dataset('valid_signals', data=valid_pred)
-                        h5f.create_dataset('valid_dates', data=valid_date)
-                        h5f.create_dataset('valid_return', data=valid_return)
+                        with h5py.File(signal_path + mode + '_signal_%d.h5' % num, 'w') as h5f:
+                            h5f.create_dataset('train_signals', data=train_pred)
+                            h5f.create_dataset('train_dates', data=train_date)
+                            h5f.create_dataset('train_return', data=train_return)
 
-                        h5f.create_dataset('test_signals', data=test_pred)
-                        h5f.create_dataset('test_dates', data=test_date)
-                        h5f.create_dataset('test_return', data=test_return)
+                            h5f.create_dataset('valid_signals', data=valid_pred)
+                            h5f.create_dataset('valid_dates', data=valid_date)
+                            h5f.create_dataset('valid_return', data=valid_return)
 
-                        h5f.create_dataset('tickers', data=tickers_t)
+                            h5f.create_dataset('test_signals', data=test_pred)
+                            h5f.create_dataset('test_dates', data=test_date)
+                            h5f.create_dataset('test_return', data=test_return)
+
+                            h5f.create_dataset('tickers', data=tickers_t)
 
 
 if __name__ == '__main__':

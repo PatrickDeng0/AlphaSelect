@@ -247,3 +247,32 @@ class Y_Model(Model):
         model = tk.Model(inputs=inputs, outputs=output)
         model.compile(optimizer=self._optimizer, loss=tk.losses.MeanSquaredError(), metrics=[IC])
         self._model = model
+
+
+def model_select(mode, input_shape, float_init_lr, activation, optimizer):
+    if mode == 'cnn':
+        model = CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                         num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                         kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                         activation=activation, optimizer=optimizer)
+
+    elif mode == 'tcn':
+        model = TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                          num_dense=16, activation=activation, optimizer=optimizer)
+
+    elif mode == 'x':
+        model = X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                        num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                        kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                        activation=activation, optimizer=optimizer)
+
+    elif mode == 'y':
+        model = Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                        num_vr_kernel=32, num_time_kernel=16, num_dense=16,
+                        kernel_size=(2, 1), pool_size=(2, 1), strides=(2, 1),
+                        activation=activation, optimizer=optimizer)
+
+    else:
+        model = LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
+                           num_dense=16, activation=activation, optimizer=optimizer)
+    return model

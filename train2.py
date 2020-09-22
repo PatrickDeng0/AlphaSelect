@@ -64,7 +64,7 @@ def main(inputs):
         tf.config.experimental.set_memory_growth(gpu, True)
     print('GPU working', tf.test.is_gpu_available())
 
-    log_path = 'logs/'
+    log_path = 'logs_2/'
     os.makedirs(log_path, exist_ok=True)
 
     tickers, train_date, valid_date, test_date, train_data, valid_data, test_data \
@@ -90,7 +90,7 @@ def main(inputs):
     print('Model: %s, Activation: %s, Optimizer: %s' % (mode, activation, optimizer))
     print(dt.datetime.now())
 
-    log_path = 'logs/' + '_'.join([size, select, start_bar, market]) + '/' + optimizer + '/'
+    log_path = 'logs_2/' + '_'.join([size, select, start_bar, market]) + '/' + optimizer + '/'
     os.makedirs(log_path, exist_ok=True)
 
     batch_IC_res, signal_IC_res = [], []
@@ -98,32 +98,8 @@ def main(inputs):
         print('=============================================================================')
         print('=============================================================================')
         print('Validation %d' % i)
-        if mode == 'cnn':
-            model = Model.CNN_Pred(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                   num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                   kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                   activation=activation, optimizer=optimizer)
 
-        elif mode == 'tcn':
-            model = Model.TCN_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                    num_dense=16, activation=activation, optimizer=optimizer)
-
-        elif mode == 'x':
-            model = Model.X_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                  num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                  kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                  activation=activation, optimizer=optimizer)
-
-        elif mode == 'y':
-            model = Model.Y_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                  num_vr_kernel=32, num_time_kernel=16, num_dense=16,
-                                  kernel_size=(2,1), pool_size=(2,1), strides=(2,1),
-                                  activation=activation, optimizer=optimizer)
-
-        else:
-            model = Model.LSTM_Model(mode=mode, input_shape=input_shape, learning_rate=float_init_lr,
-                                     num_dense=16, activation=activation, optimizer=optimizer)
-
+        model = Model.model_select(mode, input_shape, float_init_lr, activation, optimizer)
         model._build_model()
         model.summary()
         history = model.fit(train_data, valid_data, epochs=50)

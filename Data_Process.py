@@ -62,14 +62,12 @@ def time_cut(d_res, ticks_res, trans_res, min_dates, max_dates):
     index_cut(trans_res, res_trans_dates, daily=False)
 
 
-def extract_2_X(size, Y_select, bar, market):
+def extract_2_X(bar, market, min_dates=20160108, max_dates=20181231):
     d_res = mat_reader('data/Raw.mat')
     ticks_res = ticks_reader('data/w_data_ticks_15min.h5')
     trans_res = trans_reader('data/w_data_trans_15min.h5')
 
     # Find the dates of total dataset
-    min_dates = 20160108
-    max_dates = 20181231
     time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
 
     print('d_res shape:', d_res[-1].shape)
@@ -135,9 +133,7 @@ def extract_2_X(size, Y_select, bar, market):
                np.array([market_ret, market_ret_intra[:-1]])
                ]
     dates = dates[:-1]
-    train_split = np.sum(dates <= 20180000)
-    test_split = np.sum(dates <= 20180699)
-    return tickers, dates, dataset, train_split, test_split
+    return tickers, dates, dataset
 
 
 def X_cut(dataset, start, end, size, Y_select, bar):
@@ -195,7 +191,9 @@ def ele_normalize(ele, full):
 
 
 def main(size, Y_select, bar, market):
-    tickers, dates, dataset, train_split, test_split = extract_2_X(size, Y_select, bar, market)
+    tickers, dates, dataset = extract_2_X(bar, market, min_dates=20160108, max_dates=20181231)
+    train_split = np.sum(dates <= 20180000)
+    test_split = np.sum(dates <= 20180699)
     end_dateset = dataset[0].shape[1]
     print('Extract Finish!')
     train_data = X_cut(dataset, 0, train_split, size, Y_select, bar)
@@ -234,6 +232,34 @@ def main(size, Y_select, bar, market):
     # ax3.set_title('Test')
     # fig.savefig('data/%d_intraday_ret.jpeg' % size)
     return tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
+
+
+def main2(size, Y_select, bar, market):
+    tickers, dates, dataset = extract_2_X(bar, market, min_dates=20160108, max_dates=20191231)
+    print('Extract Finish!')
+    start_split_pts = [20160108, 20160699, 20170000]
+    train_split_pts = [20180000, 20180699, 20190000]
+    test_split_pts = [20180699, 20190000, 20190699]
+    end_split_pts = [20190000, 20190699, 20191299]
+
+    train_datas, valid_datas, test_datas = [], [], []
+    train_dates, valid_dates, test_dates = [], [], []
+
+    for i in range(len(start_split_pts)):
+        start_split = np.sum(dates <= start_split_pts[i])
+        train_split = np.sum(dates <= train_split_pts[i])
+        test_split = np.sum(dates <= test_split_pts[i])
+        end_split = np.sum(dates <= end_split_pts[i])
+
+        train_datas.append(X_cut(dataset, start_split, train_split, size, Y_select, bar))
+        valid_datas.append(X_cut(dataset, train_split, test_split, size, Y_select, bar))
+        test_datas.append(X_cut(dataset, test_split, end_split, size, Y_select, bar))
+
+        train_dates.append(dates[start_split+size:train_split])
+        valid_dates.append(dates[train_split+size:test_split])
+        test_dates.append(dates[test_split+size:end_split])
+
+    return tickers, train_dates, valid_dates, test_dates, train_datas, valid_datas, test_datas
 
 
 if __name__ == '__main__':

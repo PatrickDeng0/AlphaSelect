@@ -2,7 +2,7 @@ import sys, os
 
 size, select, start_bar, market, activation, mode, optimizer, GPU = sys.argv[1:]
 
-log_path = 'logs/train_logs/'
+log_path = 'logs_2/train_logs/'
 os.makedirs(log_path, exist_ok=True)
 
 log_name = '%s_%s_%s_%s_%s_train.log' % (size, select, start_bar, mode, optimizer)

@@ -6,82 +6,6 @@ import datetime as dt
 import matplotlib.pyplot as plt
 
 
-def get_data(size, Y_select, bar, market):
-    d_res = Data_Process.mat_reader('data/Raw.mat')
-    ticks_res = Data_Process.ticks_reader('data/w_data_ticks_15min.h5')
-    trans_res = Data_Process.trans_reader('data/w_data_trans_15min.h5')
-
-    # Find the dates of total dataset
-    min_dates = 20160108
-    max_dates = 20191231
-    Data_Process.time_cut(d_res, ticks_res, trans_res, min_dates, max_dates)
-
-    print('d_res shape:', d_res[-1].shape)
-    print('ticks_res shape:', ticks_res[-1].shape)
-    print('trans_res shape:', trans_res[-1].shape)
-
-    # Unzip
-    _, dates, st_state, AdjustClse, clse, pclse, val, shr, TotalShares = d_res
-    tickers, _, ask_order_volume_total, bid_order_volume_total, volume, close, pre_close, vwap = ticks_res
-    _, _, amount_ask, amount_bid = trans_res
-
-    amount_ask[np.isnan(amount_ask)] = 1
-    amount_bid[np.isnan(amount_bid)] = 1
-
-    # Judge whether there is mistake data at first!
-    daily_ret = clse / pclse - 1
-    daily_ret_mistake = np.where(np.abs(daily_ret) > 0.11)
-    clse[daily_ret_mistake] = np.nan
-    pclse[daily_ret_mistake] = np.nan
-    AdjustClse[daily_ret_mistake] = np.nan
-
-    close[np.where(np.abs(close / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
-    pre_close[np.where(np.abs(pre_close / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
-    vwap[np.where(np.abs(vwap / pre_close[:,:,0][:,:,np.newaxis] - 1) > 0.11)] = np.nan
-
-    # Judge whether that bar is trade limit (If so, exclude from market return)
-    bar_trade_limit = (np.abs(close / pre_close[:,:,0][:,:,np.newaxis] - 1) < 0.095)
-
-    # calculate the adjuested price, market value
-    adjust_coef = AdjustClse / clse
-    adj_close = close * adjust_coef[:, :, np.newaxis]
-    adj_pre_close = pre_close * adjust_coef[:, :, np.newaxis]
-    adj_vwap = vwap * adjust_coef[:, :, np.newaxis]
-
-    # Get daily and intraday stock return
-    close_ret = (close[1:] / pre_close[1:,:,0][:,:,np.newaxis]) * \
-                (close[:-1,:,-1][:,:,np.newaxis] / close[:-1]) - 1
-    close_ret_intra = close[:, :, -1][:, :, np.newaxis] / close - 1
-
-    # Get close daily and intraday market return (interday and intraday)
-    # Get market return through market value weighted mean
-    if market == 'm':
-        stock_value = TotalShares * pclse
-        market_value = np.nansum(stock_value, axis=1)
-        stock_weights = stock_value / market_value[:, np.newaxis]
-        market_ret = np.nansum(close_ret * bar_trade_limit[:-1] * stock_weights[1:, :, np.newaxis], axis=1)
-        market_ret_intra = np.nansum(close_ret_intra * bar_trade_limit * stock_weights[:, :, np.newaxis], axis=1)
-
-    # Get market return through simple mean
-    else:
-        market_ret = np.nanmean(close_ret * bar_trade_limit[:-1], axis=1)
-        market_ret_intra = np.nanmean(close_ret_intra * bar_trade_limit, axis=1)
-
-    # Get whether is able to trade
-    trade_state = bar_trade_limit[:, :, bar]
-
-    # Split dataset according to dates
-    dataset = [np.array([st_state[:-1], trade_state[:-1]]),
-               np.array([ask_order_volume_total[:-1], bid_order_volume_total[:-1], volume[:-1],
-                         adj_close[:-1], adj_pre_close[:-1], adj_vwap[:-1],
-                         amount_ask[:-1], amount_bid[:-1]]),
-               np.array([close_ret, close_ret_intra[:-1]]),
-               np.array([market_ret, market_ret_intra[:-1]])
-               ]
-    dates = dates[size:-1]
-    return tickers, dates, dataset
-
-
 def get_res(model, dataset, size, Y_select, bar):
     daily, features, stock_rets, market_rets = dataset[0], dataset[1], \
                                                dataset[2][Y_select,:,:,bar], dataset[3][Y_select,:,bar]
@@ -160,7 +84,8 @@ def get_perform(y_pred, y_true, model_prefix):
 
 def main(size, Y_select, bar, mode):
     input_shape = (size*16+bar+1, 8)
-    tickers, dates, dataset = get_data(size, Y_select, bar, 'e')
+    tickers, dates, dataset = Data_Process.extract_2_X(bar, 'e', min_dates=20160108, max_dates=20191231)
+    dates = dates[size:]
 
     model_prefix = str(size) + '_' + str(Y_select) + '_' + str(bar) + '_' + mode
     if mode == 'cnn':
