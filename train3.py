@@ -155,16 +155,16 @@ def main(inputs):
     os.makedirs(signal_path, exist_ok=True)
 
     for market in markets:
-        tickers, train_dates, valid_dates, test_dates, train_datas, valid_datas, test_datas \
-            = Data_Process.main2(int(size), int(select), int(start_bar), market)
+        datas = Data_Process.main2(int(size), int(select), int(start_bar), market)
+        num = 0
 
-        tickers_t = []
-        for ticker in tickers:
-            tickers_t.append(ticker.encode())
+        for data in datas:
+            num += 1
+            tickers, train_date, valid_date, test_date, train_data, valid_data, test_data = data
 
-        for num in range(3):
-            train_data, valid_data, test_data = train_datas[num], valid_datas[num], test_datas[num]
-            train_date, valid_date, test_date = train_dates[num], valid_dates[num], test_dates[num]
+            tickers_t = []
+            for ticker in tickers:
+                tickers_t.append(ticker.encode())
 
             train_data, train_data_signal = train_data
             valid_data, valid_data_signal = valid_data

@@ -242,24 +242,20 @@ def main2(size, Y_select, bar, market):
     test_split_pts = [20180699, 20190000, 20190699]
     end_split_pts = [20190000, 20190699, 20191299]
 
-    train_datas, valid_datas, test_datas = [], [], []
-    train_dates, valid_dates, test_dates = [], [], []
-
     for i in range(len(start_split_pts)):
         start_split = np.sum(dates <= start_split_pts[i])
         train_split = np.sum(dates <= train_split_pts[i])
         test_split = np.sum(dates <= test_split_pts[i])
         end_split = np.sum(dates <= end_split_pts[i])
 
-        train_datas.append(X_cut(dataset, start_split, train_split, size, Y_select, bar))
-        valid_datas.append(X_cut(dataset, train_split, test_split, size, Y_select, bar))
-        test_datas.append(X_cut(dataset, test_split, end_split, size, Y_select, bar))
+        train_data = X_cut(dataset, start_split, train_split, size, Y_select, bar)
+        valid_data = X_cut(dataset, train_split, test_split, size, Y_select, bar)
+        test_data = X_cut(dataset, test_split, end_split, size, Y_select, bar)
 
-        train_dates.append(dates[start_split+size:train_split])
-        valid_dates.append(dates[train_split+size:test_split])
-        test_dates.append(dates[test_split+size:end_split])
-
-    return tickers, train_dates, valid_dates, test_dates, train_datas, valid_datas, test_datas
+        train_date = dates[start_split+size:train_split]
+        valid_date = dates[train_split+size:test_split]
+        test_date = dates[test_split+size:end_split]
+        yield tickers, train_date, valid_date, test_date, train_data, valid_data, test_data
 
 
 if __name__ == '__main__':
